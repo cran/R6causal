@@ -1,7 +1,7 @@
 Package: R6causal
 Type: Package
 Title: R6 Class for Structural Causal Models
-Version: 0.6.0
+Version: 0.6.1
 Authors@R: person("Juha", "Karvanen", email = "juha.karvanen@iki.fi",
                   role = c("aut", "cre"), comment = c(ORCID = "0000-0001-5530-769X")) 
 Maintainer: Juha Karvanen <juha.karvanen@iki.fi>
@@ -13,7 +13,7 @@ Imports: causaleffect, data.table, dosearch, igraph, R6, stats
 Suggests: rmarkdown, knitr, qgraph, sqldf
 VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2021-08-05 12:24:52 UTC; juhak
+Packaged: 2022-08-01 06:56:51 UTC; juhak
 Author: Juha Karvanen [aut, cre] (<https://orcid.org/0000-0001-5530-769X>)
 Repository: CRAN
-Date/Publication: 2021-08-06 08:20:13 UTC
+Date/Publication: 2022-08-06 08:50:05 UTC
