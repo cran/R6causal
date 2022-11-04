@@ -267,6 +267,54 @@ SCM <- R6::R6Class("SCM",
           stop("`$vflist` is read only", call. = FALSE)
         }
       },
+      #' @field uflist List of the structural functions of unobserved variables.
+      uflist = function(value) {
+        if (missing(value)) {
+          private$.uflist
+        } else {
+          stop("`$uflist` is read only", call. = FALSE)
+        }
+      },
+      #' @field ufsymb List of the names of unobserved variables.
+      ufsymb = function(value) {
+        if (missing(value)) {
+          private$.ufsymb
+        } else {
+          stop("`$uflist` is read only", call. = FALSE)
+        }
+      },
+      #' @field rflist List of the structural functions of missingness indicators.
+      rflist = function(value) {
+        if (missing(value)) {
+          private$.rflist
+        } else {
+          stop("`$rflist` is read only", call. = FALSE)
+        }
+      },
+      #' @field rfsymb List of the names of missingness indicators.
+      rfsymb = function(value) {
+        if (missing(value)) {
+          private$.rfsymb
+        } else {
+          stop("`$rflist` is read only", call. = FALSE)
+        }
+      },
+      #' @field rprefix Prefix used to mark missingness indicators.
+      rprefix = function(value) {
+        if (missing(value)) {
+          private$.rprefix
+        } else {
+          stop("`$rprefix` is read only", call. = FALSE)
+        }
+      },
+      #' @field starsuffix Suffix used to mark variables with missing data.
+      starsuffix  = function(value) {
+        if (missing(value)) {
+          private$.starsuffix 
+        } else {
+          stop("`$starsuffix ` is read only", call. = FALSE)
+        }
+      },
       #' @field simdata Data table containing data simulated from the SCM.
       simdata = function(value) {
         if (missing(value)) {
@@ -562,16 +610,21 @@ SCM <- R6::R6Class("SCM",
       },
      #' @description
      #' Simulate data from the SCM object.
-     #' Creates or updates \code{simdata}.
+     #' Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
      #' If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
      #' @param n Number of observations to be generated.
      #' @param no_missing_data Logical, should the generation of missing data skipped? (defaults FALSE).
+     #' @param seed NULL or a number for \code{set.seed}.
      #' @param fixedvars List of variables that remain unchanged.
+     #' @param store_simdata Logical, should the simulated data to be stored in the SCM object (defaults TRUE)
+     #' @param return_simdata Logical, should the simulated data to be returned as the output (defaults FALSE)
      #' @examples
+     #' backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
      #' backdoor$simulate(10)
      #' backdoor$simdata
-      simulate = function(n = 1, no_missing_data = FALSE, fixedvars = NULL) {
-          if( is.null(fixedvars)) {
+      simulate = function(n = 1, no_missing_data = FALSE, seed = NULL, fixedvars = NULL, store_simdata = TRUE, return_simdata = FALSE) {
+        if(!is.null(seed)) set.seed(seed)
+        if( is.null(fixedvars)) {
             simdata <- data.table::data.table(matrix(as.numeric(NA), ncol = private$.num_uv, nrow = n))
             colnames(simdata) <- private$.uvnames
           } else {
@@ -596,9 +649,21 @@ SCM <- R6::R6Class("SCM",
                                                         simdata[ , ..arguments]))
             }
           }
+        attr(simdata,"SCMname") <- private$.name
+        attr(simdata,"timestamp") <- date()
+        attr(simdata,"seed") <- ifelse(is.null(seed),"",seed)
+        if(no_missing_data | is.null(private$.rflist)) {
+          attr(simdata,"graph") <- private$.graphtext
+        } else {
+          attr(simdata,"graph") <- private$.graphtext_md
+        }
+        if(store_simdata) {
           private$.simdata <- simdata
           private$.simdata_md <- NULL
-
+        }
+        if(return_simdata & (no_missing_data | is.null(private$.rflist))) {
+          return(simdata) 
+        }
         if(!no_missing_data & !is.null(private$.rflist)) {
           if( is.null(fixedvars) | !any(private$.rnames %in% fixedvars)) {
             simdata_md <- cbind( private$.simdata, data.table::data.table(matrix(NA, ncol = private$.num_r, nrow = n)))
@@ -630,7 +695,13 @@ SCM <- R6::R6Class("SCM",
           simdata_md <- simdata_md[, ..mdvars, drop = FALSE]
           names(simdata_md) <- c(paste0(private$.rnames_target, private$.starsuffix), private$.rnames_prefix)
           private$.simdata_md <- simdata_md
-          }
+        }
+        if(store_simdata  & !no_missing_data & !is.null(private$.rflist)) {
+          private$.simdata_md <- simdata_md
+        }
+        if(return_simdata & !no_missing_data & !is.null(private$.rflist)) {
+          return(simdata_md) 
+        }
       },
      #' @description
      #' Is a causal effect identifiable from observational data?
@@ -662,7 +733,7 @@ SCM <- R6::R6Class("SCM",
      #' @examples
      #' backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
       dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
-                          missing_data  = NULL, control  = NULL) {
+                          missing_data  = NULL, control  = list()) {
         if(is.null(missing_data)  & !is.null(private$.rflist)) {
           missing_data <- paste( paste0(private$.rnames_prefix," : ",private$.rnames_target), collapse = ", ")
         }
@@ -677,7 +748,153 @@ SCM <- R6::R6Class("SCM",
                                      missing_data = missing_data, control = control))
       }
     )
+) #End of R6class SCM
+
+#' R6 Class for parallel world models
+#' 
+#' Inherits R6 class SCM. 
+#' @export
+ParallelWorld <- R6Class("ParallelWorld",
+                         inherit = SCM,
+                         private = list(
+                           .num_worlds = NULL,
+                           .worldnames = NULL,
+                           .worldsuffix = NULL,
+                           .originalscm = NULL,
+                           .dolist = NULL
+                         ),
+                         active = list(
+                           #' @field num_worlds Number of parallel worlds.
+                           num_worlds = function(value) {
+                             if (missing(value)) {
+                               private$.num_worlds
+                             } else {
+                               stop("`$num_worlds` is read only", call. = FALSE)
+                             }
+                           },
+                           #' @field worldnames Names of parallel worlds.
+                           worldnames = function(value) {
+                             if (missing(value)) {
+                               private$.worldnames
+                             } else {
+                               private$.worldnames <- value
+                             }
+                           },
+                           #' @field worldsuffix Suffix used for parallel world variables.
+                           worldsuffix = function(value) {
+                             if (missing(value)) {
+                               private$.worldsuffix
+                             } else {
+                               stop("`$worldsuffix` is read only", call. = FALSE)
+                             }
+                           },
+                           #' @field originalscm SCM from which the parallel worlds are derived.
+                           originalscm = function(value) {
+                             if (missing(value)) {
+                               private$.originalscm
+                             } else {
+                               stop("`$originalscm` is read only", call. = FALSE)
+                             }
+                           },
+                           #' @field dolist List containing the interventions for each world.
+                           dolist = function(value) {
+                             if (missing(value)) {
+                               private$.dolist
+                             } else {
+                               stop("`$dolist` is read only", call. = FALSE)
+                             }
+                           }
+                         ),
+                         public = list(
+                           #' @description
+                           #' Create a new ParallelWorld object from an SCM object.
+                           #' @param scm An SCM object.
+                           #' @param dolist A list containing the interventions for each world. Each element 
+                           #' of the list has the fields:
+                           #' \itemize{
+                           #' \item target: a vector of variable names that specify the target
+                           #' variable(s) of the counterfactual intervention.
+                           #' \item ifunction: a list of functions for the counterfactual intervention.
+                           #' }
+                           #' @param worldnames A character vector giving the names of the parallel worlds.
+                           #' @param worldsuffix A text giving the suffix used for parallel world variables 
+                           #' before the world number. Defaults to "_" and the worlds have then suffixes 
+                           #' "_1", "_2", "_3", ...
+                           #' @return A new `ParallelWorld` object that also belongs to class `SCM`.
+                           #' @examples
+                           #' backdoor_parallel <- ParallelWorld$new(
+                           #'                         backdoor,
+                           #'                         dolist=list(
+                           #'                             list(target = "x", 
+                           #'                                  ifunction = 0),
+                           #'                             list(target = list("z","x"), 
+                           #'                                  ifunction = list(1,0))
+                           #'                         )
+                           #' )
+                           #' backdoor_parallel 
+                           #' plot(backdoor_parallel)
+                           initialize = function(scm, dolist, worldnames = NULL, 
+                                                 worldsuffix = "_") {
+                             private$.originalscm <- scm$clone(deep = TRUE) #.originalscm must be read only
+                             private$.dolist <- dolist
+                             private$.name <- scm$name
+                             if(!is.null(worldnames)) {
+                               private$.worldnames <- worldnames 
+                             } else {
+                               private$.worldnames <- 1:length(dolist)
+                             }
+                             private$.worldsuffix <- worldsuffix
+                             private$.uflist <-  scm$uflist
+                             private$.rflist <-  scm$rflist
+                             private$.rprefix <- scm$rprefix
+                             private$.starsuffix <- scm$starsuffix
+                             vflist <- scm$vflist
+                             for(j in 1:length(dolist)) {
+                               twin <- scm$clone()
+                               twin$intervene(dolist[[j]]$target, dolist[[j]]$ifunction) 
+                               newnames <- paste0(names(twin$vflist), worldsuffix, j)
+                               names(newnames) <- names(twin$vflist)
+                               for(k in 1:length(twin$vflist)) {
+                                 newfunction <- rename_arguments(twin$vflist[[k]], newnames)
+                                 vflist <- c(vflist, newfunction) 
+                                 names(vflist)[length(vflist)] <- newnames[k] 
+                               }
+                             }
+                             private$.vflist <- lapply( vflist, private$.parsefunction)
+                             
+                             private$.num_u <- length(private$.uflist)
+                             private$.num_v <- length(private$.vflist)
+                             private$.num_r <- length(private$.rflist)
+                             private$.num_uv <- private$.num_u + private$.num_v
+                             private$.num_vr <- private$.num_v + private$.num_r
+                             private$.num_uvr <- private$.num_u + private$.num_v + private$.num_r
+                             private$.vnames <- names(private$.vflist)
+                             private$.unames <- names(private$.uflist)
+                             private$.uvnames <- c( private$.unames, private$.vnames)
+                             private$.derive_graph()
+                             if( !is.null(private$.rflist)) {
+                               private$.rprefix <- private$.rprefix
+                               private$.starsuffix <- private$.starsuffix
+                               private$.rnames_target  <- names(private$.rflist)
+                               private$.rnames_prefix  <- paste0( private$.rprefix, 
+                                                                  names(private$.rflist))
+                               private$.rnames <- private$.rnames_prefix
+                               private$.rflist_prefix <- private$.rflist
+                               names(private$.rflist_prefix) <- private$.rnames
+                               private$.rmapping_from_prefix <- as.list(names(private$.rflist))
+                               names(private$.rmapping_from_prefix) <- private$.rnames
+                               private$.rmapping_to_prefix <- as.list(private$.rnames)
+                               names(private$.rmapping_to_prefix) <- names(private$.rflist)
+                               private$.vrflist <- c(private$.vflist, private$.rflist_prefix)
+                               private$.vrnames <- names(private$.vrflist)
+                               private$.uvrnames <- c(private$.unames, private$.vrnames)
+                               private$.derive_graph_md()
+                             }
+                           }
+                         )
 )
+
+
 
 
 cumsum0 <- function(x) {
@@ -849,48 +1066,21 @@ backdoor_md <- SCM$new("backdoor_md",
                        rprefix = "r_"
 )
 
-
-#' Counterfactual inference via simulation
-#'
-#' @param scm An SCM object
-#' @param situation A list or a character string. The list has the following elements:
-#' \itemize{
-#' \item do : NULL or a list containing named elements 'target' and 'ifunction' that
-#' specify the intervention carried out in the situation
-#' \item condition : either a string that gives an SQL query ( "select x,y,z from DATA where" )
-#' or a data.table consisting of the valid rows
-#' }
-#' The character string specifies an SQL query ( "select x,y,z from DATA where" )
-#' @param target A vector of variable names that specify the target
-#' variable(s) of the counterfactual intervention.
-#' @param ifunction A list of functions for the counterfactual intervention.
-#' @param n Size of the data to be simulated
-#' @param slotsize A scalar, the number of rows to be simulated for a slot
-#' @param maxslots A scalar, the maximum number of slots
-#' @param situationSQL Logical, is the situation defined as an SQL query, defaults FALSE
-#' @return A data table representing the situation after the counterfactual intervention
-#' @examples
-#' cfdata <- counterfactual(backdoor,
-#'                          situation = list(do = list(target = "x", ifunction = 0),
-#'                          condition = data.table::data.table( x = 0, y = 0)),
-#'                          target = "x",
-#'                          ifunction = 1,
-#'                          n = 100000)
-#' mean(cfdata$y)
-#' @export
-counterfactual <- function(scm, situation, target, ifunction, n, slotsize = 10000, maxslots = 100, situationSQL = FALSE) {
-  twin <- scm$clone()
-  if(!is.null( situation$do)) {
-    twin$intervene(situation$do$target, situation$do$ifunction)
-  }
+scm_rejection_sampling <- function(twin, situation, n, control) {
+  # \itemize{
+  # \item slotsize A scalar, the number of rows to be simulated for a slot (rejection sampling)
+  # \item maxslots A scalar, the maximum number of slots (rejection sampling)
+  # }
+  slotsize <- control$slotsize 
+  maxslots <- control$maxslots
   twin$simulate(1)
   cf_data <- twin$simdata[0]
   sloti <- 1
   while( nrow(cf_data) < n & sloti <= maxslots) {
-    twin$simulate(slotsize)
-    if(situationSQL) {
+    twin$simulate(n=slotsize)
+    if( identical( class(situation$condition), "character")) {
       if (!requireNamespace("sqldf", quietly = TRUE)) {
-        stop("Package \"sqldf\" needed when situationSQL == TRUE. Please install it.",
+        stop("Package \"sqldf\" needed when the condition is given as SQL. Please install it.",
              call. = FALSE)
       }
       DATA <- twin$simdata
@@ -901,14 +1091,131 @@ counterfactual <- function(scm, situation, target, ifunction, n, slotsize = 1000
     cf_data <- rbind(cf_data, validdata)
     sloti <- sloti + 1
   }
+  return(cf_data)
+}
+
+
+#' Counterfactual inference via simulation
+#'
+#' @param scm An SCM object
+#' @param situation A list or a character string. The list has the following elements:
+#' \itemize{
+#' \item do : NULL or a list containing named elements 'target' and 'ifunction' that
+#' specify the intervention carried out in the situation
+#' \item dolist : NULL or a list of lists containing named elements 'target' and 
+#' 'ifunction' that specify the intervention carried out in each parallel world
+#' \item condition : either a string that gives an SQL query ( e.g. "select x,y,z from DATA where" )
+#' or a data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))
+#' }
+#' @param n Size of the data to be simulated
+#' @param target NULL or a vector of variable names that specify the target
+#' variable(s) of the counterfactual intervention.
+#' @param ifunction NULL or a list of functions for the counterfactual intervention.
+#' @param returnscm A logical, should the internally created twin SCM or parallel 
+#' world SCM returned?
+#' @param control List of parameters to be passed to the simulation method 
+#' @return A data table representing the situation after the counterfactual intervention
+#' @examples
+#' cfdata <- counterfactual(backdoor,
+#'                          situation = list(
+#'                              do = list(target = "x", ifunction = 0),
+#'                              condition = data.table::data.table( x = 0, y = 0)),
+#'                          target = "x",
+#'                          ifunction = 1,
+#'                          n = 1000)
+#' mean(cfdata$y)
+#' 
+#' backdoor_parallel <- ParallelWorld$new(backdoor,
+#'                                        dolist=list(
+#'                                          list(target = "x", ifunction = 0),
+#'                                          list(target = list("z","x"), ifunction = list(1,0))
+#'                                        )
+#' )
+#' cfdata2 <- counterfactual(backdoor_parallel,
+#'                          situation = list(
+#'                              do = NULL,
+#'                              condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+#'                          target = "x",
+#'                          ifunction = 1,
+#'                          n = 1000)
+#' mean(cfdata2$y)
+#' @export
+counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, returnscm = FALSE, control = list()) {
+  control_defaults <- list(method = "rejection", slotsize = 10000, maxslots = 100)
+  control_new <- control_defaults
+  if(length(control)==0) {
+    control <- control_defaults   
+  } else {
+    for(j in 1:length(control)) {
+      ind <- try(match.arg( names(control)[[j]], names(control_defaults)))
+      if(!inherits(ind, "try-error")) control_new[[ind]] <- control[[ind]]
+    }
+    control <- control_new
+  }
+  if(!is.null(situation$dolist)) {
+    twin <- ParallelWorld$new(scm, situation$dolist)     
+  } else {
+    twin <- scm$clone()
+    if(!is.null( situation$do)) {
+      twin$intervene(situation$do$target, situation$do$ifunction)
+    }
+  }
+  if( identical(control$method, "rejection")) {
+    cf_data <- scm_rejection_sampling(twin, situation, n, control)
+  }
   truen <- min(n, nrow(cf_data))
   twin$simdata <- cf_data[1:truen, ]
-  twin$intervene(target, ifunction)
-  fixedvars <- names( twin$simdata)
-  fixedvars <- setdiff( fixedvars, descendants(target, scm$igraph) )
-  twin$simulate(truen, fixedvars =  fixedvars)
-  return( twin$simdata)
+  if(!is.null(target)) {
+    twin$intervene(target, ifunction)
+    fixedvars <- names( twin$simdata)
+    fixedvars <- setdiff( fixedvars, descendants(target, scm$igraph) )
+    twin$simulate(truen, fixedvars =  fixedvars)
+  } 
+  if(returnscm) {
+    return(twin) 
+  } else {
+    return( twin$simdata)
+  }
 }
+
+
+# https://stackoverflow.com/questions/33850219/change-argument-names-inside-a-function-r
+## Function to replace variables in function body
+## expr is `body(f)`, keyvals is a lookup table for replacements
+replace_vars <- function(expr, keyvals) {
+  if (!length(expr)) return()
+  for (i in seq_along(expr)) {
+    if (is.call(expr[[i]])) expr[[i]][-1L] <- Recall(expr[[i]][-1L], keyvals)
+    if (is.name(expr[[i]]) && deparse(expr[[i]]) %in% names(keyvals))
+      expr[[i]] <- as.name(keyvals[[deparse(expr[[i]])]])
+  }
+  return( expr )
+}
+
+replace_formals <- function(forms, keyvals) {
+  if (!length(forms)) return()
+  formsnames <- names(forms)
+  for (i in seq_along(forms)) {
+      newname <- keyvals[formsnames[i]]
+      if(!is.na(newname)) formsnames[i] <- newname
+  }
+  names(forms) <- formsnames
+  return( forms )
+}
+
+rename_arguments <- function(f,newnames) {
+  newbody <- replace_vars(body(f), newnames)
+  newfunction <- f
+  body(newfunction) <- newbody
+  newformals <- replace_formals(formals(f), newnames) 
+  formals(newfunction) <- newformals
+  return(newfunction)
+}
+# f <- function(x, y) -x^2 + x + -y^2 + y
+# newvals <- c('x'='x0', 'y'='y0')  # named lookup vector
+# f2 <- rename_arguments(f,newvals)
+# f3 <- rename_arguments(f,c('x'='x0'))
+
 
 #' Conduct a sequence of interventions and collect the simulated data.
 #'

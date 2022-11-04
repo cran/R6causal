@@ -1,3 +1,8 @@
+# R6causal 0.7.0
+
+* Added R6 class `ParallelWorld` to enable more general counterfactual simulations.
+* Improved output control for simulations.
+
 # R6causal 0.6.1
 
 * A minor change due to change in the igraph package.

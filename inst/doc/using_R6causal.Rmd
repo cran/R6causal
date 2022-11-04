@@ -1,7 +1,7 @@
 ---
 title: "Using R6causal"
 author: "Juha Karvanen"
-date: "2021-08-04"
+date: "2022-11-03"
 output: rmarkdown::pdf_document
 vignette: >
   %\VignetteIndexEntry{using_R6causal}
@@ -40,8 +40,11 @@ In addition, there are functions for
 # Setup
 ```{r setup}
 library(R6causal)
+#library(R6)
+#library(igraph)
 library(data.table)
 library(stats)
+#source("../../R/R6causal.R")
 ```
 
 # Defining the model
@@ -194,7 +197,7 @@ backdoor$causal.effect(y = "y", x = "x")
 backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 ```
 
-# Counterfactual inference
+# Counterfactual inference (a simple case)
 
 Let us assume that intervention do(X=0) was applied and the response Y = 0 was recorded. 
 What is the probability that in this situation the intervention do(X=1) would have led to 
@@ -211,6 +214,60 @@ The result differs from P(Y = 1 | do(X = 1))
 backdoor_x1$simulate(100000)
 mean(backdoor_x1$simdata$y)
 ```
+
+# Counterfactual inference (parallel worlds)
+
+Parallel world graphs (a generalization of a twin graph)  are used for counterfactual inference with several counterfactual interventions  . The package implements class `ParallelWorld` which heritates class `SCM`. A `ParallelWorld` object is created from an `SCM` object by specifying the interventions for each world. By default the variables of the parallel worlds are named with suffixes "_1", "_2", ...
+
+In the example below, we have the original world (variables `x`, `z`, `y`) and its two variants. In the variant 1 (variables `x_1`, `z_1`, `y_1`), the value of `x` (variable `x_1` in the object) is set to be 0. In the variant 2 (variables `x_2`, `z_2`, `y_2`), the value of `x` (variable `x_2` in the object) is set to be 0 and the value of `z` (variable `z_2` in the object) is set to be 1.
+```{r parallelworldbackdoor}
+backdoor_parallel <- ParallelWorld$new(
+                         backdoor,
+                        dolist=list(
+                             list(target = "x", 
+                                 ifunction = 0),
+                             list(target = list("z","x"), 
+                                  ifunction = list(1,0))
+                         )
+ )
+backdoor_parallel
+if (requireNamespace("qgraph", quietly = TRUE)) backdoor_parallel$plot(method = "qgraph") 
+```
+
+Counterfactual data can be simulated with function `counterfactual`. In the example below, we know that variable `y` obtained value 0 in the original world as well as variants 1 and 2. We are interested in the counterfactual distribution of `y` if `x` had been set to 1.
+```{r parallelworldcounterfactual}
+cfdata <- counterfactual(backdoor_parallel,
+                         situation = list(
+                            do = NULL,
+                            condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+                         target = "x",
+                         ifunction = 1,
+                         n = 100000)
+mean(cfdata$y)
+```
+The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.
+
+An alternative way for answering the same question defines the case of interest as one of the parallel worlds (here variant 3). 
+```{r parallelworldbackdoor2}
+backdoor_parallel2 <- ParallelWorld$new(
+                         backdoor,
+                        dolist=list(
+                             list(target = "x", 
+                                 ifunction = 0),
+                             list(target = list("z","x"), 
+                                  ifunction = list(1,0)),
+                              list(target = "x", 
+                                 ifunction = 1)
+                         )
+ )
+cfdata <- counterfactual(backdoor_parallel2,
+                         situation = list(
+                            do = NULL,
+                            condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+                         n = 100000)
+mean(cfdata$y_3)
+```
+The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.
 
 # A model with a missing data mechanism 
 The missing data mechanism is defined in similar manner as the other variables.
@@ -263,7 +320,7 @@ summary(backdoor_md$simdata)
 summary(backdoor_md$simdata_md)
 ```
 
-## Applying Do-search for a missing data problem
+## Applying Do-search to a missing data problem
 
 ```{r backdoor_md_dosearch}
 backdoor_md$dosearch(data = "p(x*,y*,z*,r_x,r_y,r_z)", query = "p(y|do(x))")

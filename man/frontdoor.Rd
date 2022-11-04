@@ -5,7 +5,7 @@
 \alias{frontdoor}
 \title{SCM "frontdoor" used in the examples.}
 \format{
-An object of class \code{SCM} (inherits from \code{R6}) of length 21.
+An object of class \code{SCM} (inherits from \code{R6}) of length 27.
 }
 \usage{
 frontdoor

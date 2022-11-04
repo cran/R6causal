@@ -67,6 +67,7 @@ backdoor_yz$plot() # to see that arrow x -> y is cut
 ## Method `SCM$simulate`
 ## ------------------------------------------------
 
+backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
 backdoor$simulate(10)
 backdoor$simdata
 
@@ -82,6 +83,18 @@ backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 \item{\code{vflist}}{List of the structural functions of observed variables.}
 
 \item{\code{vfsymb}}{List of the names of observed variables.}
+
+\item{\code{uflist}}{List of the structural functions of unobserved variables.}
+
+\item{\code{ufsymb}}{List of the names of unobserved variables.}
+
+\item{\code{rflist}}{List of the structural functions of missingness indicators.}
+
+\item{\code{rfsymb}}{List of the names of missingness indicators.}
+
+\item{\code{rprefix}}{Prefix used to mark missingness indicators.}
+
+\item{\code{starsuffix}}{Suffix used to mark variables with missing data.}
 
 \item{\code{simdata}}{Data table containing data simulated from the SCM.}
 
@@ -115,19 +128,19 @@ of the SCM including the missing data mechanism.}
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
-\item \href{#method-new}{\code{SCM$new()}}
-\item \href{#method-print}{\code{SCM$print()}}
-\item \href{#method-plot}{\code{SCM$plot()}}
-\item \href{#method-intervene}{\code{SCM$intervene()}}
-\item \href{#method-simulate}{\code{SCM$simulate()}}
-\item \href{#method-causal.effect}{\code{SCM$causal.effect()}}
-\item \href{#method-dosearch}{\code{SCM$dosearch()}}
-\item \href{#method-clone}{\code{SCM$clone()}}
+\item \href{#method-SCM-new}{\code{SCM$new()}}
+\item \href{#method-SCM-print}{\code{SCM$print()}}
+\item \href{#method-SCM-plot}{\code{SCM$plot()}}
+\item \href{#method-SCM-intervene}{\code{SCM$intervene()}}
+\item \href{#method-SCM-simulate}{\code{SCM$simulate()}}
+\item \href{#method-SCM-causal.effect}{\code{SCM$causal.effect()}}
+\item \href{#method-SCM-dosearch}{\code{SCM$dosearch()}}
+\item \href{#method-SCM-clone}{\code{SCM$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-new"></a>}}
-\if{latex}{\out{\hypertarget{method-new}{}}}
+\if{html}{\out{<a id="method-SCM-new"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-new}{}}}
 \subsection{Method \code{new()}}{
 Create a new SCM object.
 \subsection{Usage}{
@@ -185,8 +198,8 @@ A new `SCM` object.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-print"></a>}}
-\if{latex}{\out{\hypertarget{method-print}{}}}
+\if{html}{\out{<a id="method-SCM-print"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-print}{}}}
 \subsection{Method \code{print()}}{
 Print a summmary of the SCM object.
 \subsection{Usage}{
@@ -203,8 +216,8 @@ Print a summmary of the SCM object.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-plot"></a>}}
-\if{latex}{\out{\hypertarget{method-plot}{}}}
+\if{html}{\out{<a id="method-SCM-plot"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-plot}{}}}
 \subsection{Method \code{plot()}}{
 Plot the DAG of the SCM object.
 \subsection{Usage}{
@@ -233,8 +246,8 @@ backdoor$plot("v")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-intervene"></a>}}
-\if{latex}{\out{\hypertarget{method-intervene}{}}}
+\if{html}{\out{<a id="method-SCM-intervene"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-intervene}{}}}
 \subsection{Method \code{intervene()}}{
 Apply an intervention to the SCM object.
 \subsection{Usage}{
@@ -269,14 +282,21 @@ backdoor_yz$plot() # to see that arrow x -> y is cut
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-simulate"></a>}}
-\if{latex}{\out{\hypertarget{method-simulate}{}}}
+\if{html}{\out{<a id="method-SCM-simulate"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-simulate}{}}}
 \subsection{Method \code{simulate()}}{
 Simulate data from the SCM object.
-Creates or updates \code{simdata}.
+Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
 If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SCM$simulate(n = 1, no_missing_data = FALSE, fixedvars = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SCM$simulate(
+  n = 1,
+  no_missing_data = FALSE,
+  seed = NULL,
+  fixedvars = NULL,
+  store_simdata = TRUE,
+  return_simdata = FALSE
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -286,13 +306,20 @@ If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
 
 \item{\code{no_missing_data}}{Logical, should the generation of missing data skipped? (defaults FALSE).}
 
+\item{\code{seed}}{NULL or a number for \code{set.seed}.}
+
 \item{\code{fixedvars}}{List of variables that remain unchanged.}
+
+\item{\code{store_simdata}}{Logical, should the simulated data to be stored in the SCM object (defaults TRUE)}
+
+\item{\code{return_simdata}}{Logical, should the simulated data to be returned as the output (defaults FALSE)}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{backdoor$simulate(10)
+\preformatted{backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
+backdoor$simulate(10)
 backdoor$simdata
 }
 \if{html}{\out{</div>}}
@@ -301,8 +328,8 @@ backdoor$simdata
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-causal.effect"></a>}}
-\if{latex}{\out{\hypertarget{method-causal.effect}{}}}
+\if{html}{\out{<a id="method-SCM-causal.effect"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-causal.effect}{}}}
 \subsection{Method \code{causal.effect()}}{
 Is a causal effect identifiable from observational data?
 Calls the implementation of ID algorithm from package \pkg{causaleffect}.
@@ -332,8 +359,8 @@ the intervention on the set of variables (x) conditional on (z) if the effect is
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-dosearch"></a>}}
-\if{latex}{\out{\hypertarget{method-dosearch}{}}}
+\if{html}{\out{<a id="method-SCM-dosearch"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-dosearch}{}}}
 \subsection{Method \code{dosearch()}}{
 Is a causal effect or other query identifiable from given data sources?
 Calls \code{\link[dosearch]{dosearch}} from the package \pkg{dosearch}.
@@ -345,7 +372,7 @@ See the documentation of dosearch for the details.
   transportability = NULL,
   selection_bias = NULL,
   missing_data = NULL,
-  control = NULL
+  control = list()
 )}\if{html}{\out{</div>}}
 }
 
@@ -379,8 +406,8 @@ An object of class \code{dosearch}.
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-clone}{}}}
+\if{html}{\out{<a id="method-SCM-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

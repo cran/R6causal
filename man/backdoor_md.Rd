@@ -5,7 +5,7 @@
 \alias{backdoor_md}
 \title{SCM "backdoor_md" used in the examples.}
 \format{
-An object of class \code{SCM} (inherits from \code{R6}) of length 21.
+An object of class \code{SCM} (inherits from \code{R6}) of length 27.
 }
 \usage{
 backdoor_md

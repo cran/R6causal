@@ -6,8 +6,11 @@ knitr::opts_chunk$set(
 
 ## ----setup--------------------------------------------------------------------
 library(R6causal)
+#library(R6)
+#library(igraph)
 library(data.table)
 library(stats)
+#source("../../R/R6causal.R")
 
 ## ----definebackdoor-----------------------------------------------------------
 backdoor <- SCM$new("backdoor",
@@ -123,6 +126,48 @@ mean(cfdata$y)
 ## ----counterfactualcomparisonbackdoor-----------------------------------------
 backdoor_x1$simulate(100000)
 mean(backdoor_x1$simdata$y)
+
+## ----parallelworldbackdoor----------------------------------------------------
+backdoor_parallel <- ParallelWorld$new(
+                         backdoor,
+                        dolist=list(
+                             list(target = "x", 
+                                 ifunction = 0),
+                             list(target = list("z","x"), 
+                                  ifunction = list(1,0))
+                         )
+ )
+backdoor_parallel
+if (requireNamespace("qgraph", quietly = TRUE)) backdoor_parallel$plot(method = "qgraph") 
+
+## ----parallelworldcounterfactual----------------------------------------------
+cfdata <- counterfactual(backdoor_parallel,
+                         situation = list(
+                            do = NULL,
+                            condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+                         target = "x",
+                         ifunction = 1,
+                         n = 100000)
+mean(cfdata$y)
+
+## ----parallelworldbackdoor2---------------------------------------------------
+backdoor_parallel2 <- ParallelWorld$new(
+                         backdoor,
+                        dolist=list(
+                             list(target = "x", 
+                                 ifunction = 0),
+                             list(target = list("z","x"), 
+                                  ifunction = list(1,0)),
+                              list(target = "x", 
+                                 ifunction = 1)
+                         )
+ )
+cfdata <- counterfactual(backdoor_parallel2,
+                         situation = list(
+                            do = NULL,
+                            condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+                         n = 100000)
+mean(cfdata$y_3)
 
 ## ----definebackdoor_md--------------------------------------------------------
 backdoor_md <- SCM$new("backdoor_md",

@@ -7,12 +7,11 @@
 counterfactual(
   scm,
   situation,
-  target,
-  ifunction,
   n,
-  slotsize = 10000,
-  maxslots = 100,
-  situationSQL = FALSE
+  target = NULL,
+  ifunction = NULL,
+  returnscm = FALSE,
+  control = list()
 )
 }
 \arguments{
@@ -22,23 +21,23 @@ counterfactual(
 \itemize{
 \item do : NULL or a list containing named elements 'target' and 'ifunction' that
 specify the intervention carried out in the situation
-\item condition : either a string that gives an SQL query ( "select x,y,z from DATA where" )
-or a data.table consisting of the valid rows
-}
-The character string specifies an SQL query ( "select x,y,z from DATA where" )}
-
-\item{target}{A vector of variable names that specify the target
-variable(s) of the counterfactual intervention.}
-
-\item{ifunction}{A list of functions for the counterfactual intervention.}
+\item dolist : NULL or a list of lists containing named elements 'target' and 
+'ifunction' that specify the intervention carried out in each parallel world
+\item condition : either a string that gives an SQL query ( e.g. "select x,y,z from DATA where" )
+or a data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))
+}}
 
 \item{n}{Size of the data to be simulated}
 
-\item{slotsize}{A scalar, the number of rows to be simulated for a slot}
+\item{target}{NULL or a vector of variable names that specify the target
+variable(s) of the counterfactual intervention.}
 
-\item{maxslots}{A scalar, the maximum number of slots}
+\item{ifunction}{NULL or a list of functions for the counterfactual intervention.}
 
-\item{situationSQL}{Logical, is the situation defined as an SQL query, defaults FALSE}
+\item{returnscm}{A logical, should the internally created twin SCM or parallel 
+world SCM returned?}
+
+\item{control}{List of parameters to be passed to the simulation method}
 }
 \value{
 A data table representing the situation after the counterfactual intervention
@@ -48,10 +47,26 @@ Counterfactual inference via simulation
 }
 \examples{
 cfdata <- counterfactual(backdoor,
-                         situation = list(do = list(target = "x", ifunction = 0),
-                         condition = data.table::data.table( x = 0, y = 0)),
+                         situation = list(
+                             do = list(target = "x", ifunction = 0),
+                             condition = data.table::data.table( x = 0, y = 0)),
                          target = "x",
                          ifunction = 1,
-                         n = 100000)
+                         n = 1000)
 mean(cfdata$y)
+
+backdoor_parallel <- ParallelWorld$new(backdoor,
+                                       dolist=list(
+                                         list(target = "x", ifunction = 0),
+                                         list(target = list("z","x"), ifunction = list(1,0))
+                                       )
+)
+cfdata2 <- counterfactual(backdoor_parallel,
+                         situation = list(
+                             do = NULL,
+                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
+                         target = "x",
+                         ifunction = 1,
+                         n = 1000)
+mean(cfdata2$y)
 }
