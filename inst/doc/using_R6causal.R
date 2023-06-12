@@ -6,11 +6,8 @@ knitr::opts_chunk$set(
 
 ## ----setup--------------------------------------------------------------------
 library(R6causal)
-#library(R6)
-#library(igraph)
 library(data.table)
 library(stats)
-#source("../../R/R6causal.R")
 
 ## ----definebackdoor-----------------------------------------------------------
 backdoor <- SCM$new("backdoor",
@@ -75,6 +72,28 @@ backdoor_condprob <- SCM$new("backdoor",
   )
 )
 
+## ----lineargaussianbackdoor---------------------------------------------------
+lgbackdoor <- LinearGaussianSCM$new("Linear Gaussian Backdoor",
+                                    linear_gaussian = list(
+                                      uflist = list(ux = function(n) {rnorm(n)},
+                                                    uy = function(n) {rnorm(n)},
+                                                    uz = function(n) {rnorm(n)}),
+                                      vnames = c("x","y","z"),
+                                      vcoefmatrix = matrix(c(0,0.4,0,0,0,0,0.6,0.8,0),3,3),
+                                      ucoefvector = c(1,1,1),
+                                      ccoefvector = c(0,0,0)))
+print(lgbackdoor)
+
+## ----randomlineargaussian-----------------------------------------------------
+randomlg <- LinearGaussianSCM$new("Random Linear Gaussian",
+                                  random_linear_gaussian = list(
+                                  nv = 6, 
+                                  edgeprob=0.5, 
+                                  vcoefdistr = function(n) {rnorm(n)}, 
+                                  ccoefdistr = function(n) {rnorm(n)}, 
+                                  ucoefdistr = function(n) {rnorm(n)}))
+print(randomlg)
+
 ## ----printbackdoor------------------------------------------------------------
 backdoor
 
@@ -120,7 +139,8 @@ backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 ## ----counterfactualbackdoor---------------------------------------------------
 cfdata <- counterfactual(backdoor, situation = list(do = list(target = "x", ifunction = 0), 
                                                     condition = data.table( x = 0, y = 0)), 
-                         target = "x", ifunction = 1, n = 100000)
+                         target = "x", ifunction = 1, n = 100000, 
+                         control = list(method = "rejection"))
 mean(cfdata$y)
 
 ## ----counterfactualcomparisonbackdoor-----------------------------------------
@@ -147,7 +167,8 @@ cfdata <- counterfactual(backdoor_parallel,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
                          target = "x",
                          ifunction = 1,
-                         n = 100000)
+                         n = 100000,
+                         control = list(method = "rejection"))
 mean(cfdata$y)
 
 ## ----parallelworldbackdoor2---------------------------------------------------
@@ -166,7 +187,8 @@ cfdata <- counterfactual(backdoor_parallel2,
                          situation = list(
                             do = NULL,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
-                         n = 100000)
+                         n = 100000, 
+                         control = list(method = "rejection"))
 mean(cfdata$y_3)
 
 ## ----definebackdoor_md--------------------------------------------------------

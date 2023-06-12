@@ -36,15 +36,17 @@ In addition, there are functions for
 
 * running experiments 
 * counterfactual inference using simulation
+* evaluating fairness of a prediction model
+
+The class `ParallelWorld` inherits `SCM` and defines a structural causal model that describes parallel worlds for counterfactual inference.
+
+The class `LinearGaussianSCM` inherits `SCM` and defines a structural causal model where all functions are linear and all background variables follow Gaussian distribution.
 
 # Setup
 ```{r setup}
 library(R6causal)
-#library(R6)
-#library(igraph)
 library(data.table)
 library(stats)
-#source("../../R/R6causal.R")
 ```
 
 # Defining the model
@@ -123,6 +125,36 @@ backdoor_condprob <- SCM$new("backdoor",
 ```
 It is possible to mix the styles and define some elements of a function list as functions, some as text and
 some as conditional probability tables.
+
+# Defining a linear Gaussian SCM
+
+A linear Gaussian SCM can be defined giving the coefficients for the structural equations:
+```{r lineargaussianbackdoor}
+lgbackdoor <- LinearGaussianSCM$new("Linear Gaussian Backdoor",
+                                    linear_gaussian = list(
+                                      uflist = list(ux = function(n) {rnorm(n)},
+                                                    uy = function(n) {rnorm(n)},
+                                                    uz = function(n) {rnorm(n)}),
+                                      vnames = c("x","y","z"),
+                                      vcoefmatrix = matrix(c(0,0.4,0,0,0,0,0.6,0.8,0),3,3),
+                                      ucoefvector = c(1,1,1),
+                                      ccoefvector = c(0,0,0)))
+print(lgbackdoor)
+```
+
+It is also possible to generate the underlying DAG and the coefficients randomly:
+```{r randomlineargaussian}
+randomlg <- LinearGaussianSCM$new("Random Linear Gaussian",
+                                  random_linear_gaussian = list(
+                                  nv = 6, 
+                                  edgeprob=0.5, 
+                                  vcoefdistr = function(n) {rnorm(n)}, 
+                                  ccoefdistr = function(n) {rnorm(n)}, 
+                                  ucoefdistr = function(n) {rnorm(n)}))
+print(randomlg)
+```
+
+
 
 
 
@@ -206,7 +238,8 @@ the response Y = 1? We estimate this probability by means of simulation.
 ```{r counterfactualbackdoor}
 cfdata <- counterfactual(backdoor, situation = list(do = list(target = "x", ifunction = 0), 
                                                     condition = data.table( x = 0, y = 0)), 
-                         target = "x", ifunction = 1, n = 100000)
+                         target = "x", ifunction = 1, n = 100000, 
+                         control = list(method = "rejection"))
 mean(cfdata$y)
 ```
 The result differs from P(Y = 1 | do(X = 1))
@@ -242,7 +275,8 @@ cfdata <- counterfactual(backdoor_parallel,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
                          target = "x",
                          ifunction = 1,
-                         n = 100000)
+                         n = 100000,
+                         control = list(method = "rejection"))
 mean(cfdata$y)
 ```
 The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.
@@ -264,7 +298,8 @@ cfdata <- counterfactual(backdoor_parallel2,
                          situation = list(
                             do = NULL,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
-                         n = 100000)
+                         n = 100000, 
+                         control = list(method = "rejection"))
 mean(cfdata$y_3)
 ```
 The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.

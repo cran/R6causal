@@ -49,6 +49,34 @@ backdoor$plot()
 backdoor$plot("v")
 
 ## ------------------------------------------------
+## Method `SCM$add_variable`
+## ------------------------------------------------
+
+backdoor2 <- backdoor$clone()
+backdoor2$add_variable(
+   vfnew = list(
+             w = function(uw, x) {
+             return(as.numeric(uw < 0.4 + 0.3*x))}),
+   ufnew = list(
+            uw = function(n) {return(stats::runif(n))})
+) 
+
+## ------------------------------------------------
+## Method `SCM$remove_variable`
+## ------------------------------------------------
+
+backdoor2 <- backdoor$clone()
+backdoor2$remove_variable(c("uy","y"))
+#' @include R6causal.R R6causal_examples.R
+NULL
+
+## ------------------------------------------------
+## Method `SCM$dosearch`
+## ------------------------------------------------
+
+backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
+
+## ------------------------------------------------
 ## Method `SCM$intervene`
 ## ------------------------------------------------
 
@@ -70,23 +98,30 @@ backdoor_yz$plot() # to see that arrow x -> y is cut
 backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
 backdoor$simulate(10)
 backdoor$simdata
-
-## ------------------------------------------------
-## Method `SCM$dosearch`
-## ------------------------------------------------
-
-backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 }
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
 \item{\code{vflist}}{List of the structural functions of observed variables.}
 
-\item{\code{vfsymb}}{List of the names of observed variables.}
+\item{\code{vnames}}{List of the names of observed variables.}
+
+\item{\code{vfsymb}}{List of the arguments of structural functions of observed variables.}
 
 \item{\code{uflist}}{List of the structural functions of unobserved variables.}
 
-\item{\code{ufsymb}}{List of the names of unobserved variables.}
+\item{\code{unames}}{List of the names of unobserved variables.}
+
+\item{\code{unames_dedicated}}{List of the names of unobserved variables that have only one child.}
+
+\item{\code{unames_confounder}}{List of the names of unobserved variables that 
+have two or more children.}
+
+\item{\code{dedicated_u}}{Named list of the names of unobserved variables that 
+have only one child which is the name of the element.}
+
+\item{\code{is_linear_gaussian}}{Logical, does the SCM have linear functions 
+and Gaussian background variables?}
 
 \item{\code{rflist}}{List of the structural functions of missingness indicators.}
 
@@ -103,6 +138,9 @@ where missing values are indicated by \code{NA}.}
 
 \item{\code{igraph}}{The graph of the SCM in the \code{igraph} form
 (without the missing data mechanism).}
+
+\item{\code{igraph_nodedicated}}{The graph of the SCM in the \code{igraph} form
+(without the dedicated U variables and the missing data mechanism).}
 
 \item{\code{igraph_bidirected}}{The graph of the SCM in the \code{igraph} form where
 latent variables are presented by bidirected arcs.}
@@ -131,10 +169,17 @@ of the SCM including the missing data mechanism.}
 \item \href{#method-SCM-new}{\code{SCM$new()}}
 \item \href{#method-SCM-print}{\code{SCM$print()}}
 \item \href{#method-SCM-plot}{\code{SCM$plot()}}
-\item \href{#method-SCM-intervene}{\code{SCM$intervene()}}
-\item \href{#method-SCM-simulate}{\code{SCM$simulate()}}
+\item \href{#method-SCM-tikz}{\code{SCM$tikz()}}
+\item \href{#method-SCM-pa}{\code{SCM$pa()}}
+\item \href{#method-SCM-ch}{\code{SCM$ch()}}
+\item \href{#method-SCM-an}{\code{SCM$an()}}
+\item \href{#method-SCM-de}{\code{SCM$de()}}
+\item \href{#method-SCM-add_variable}{\code{SCM$add_variable()}}
+\item \href{#method-SCM-remove_variable}{\code{SCM$remove_variable()}}
 \item \href{#method-SCM-causal.effect}{\code{SCM$causal.effect()}}
 \item \href{#method-SCM-dosearch}{\code{SCM$dosearch()}}
+\item \href{#method-SCM-intervene}{\code{SCM$intervene()}}
+\item \href{#method-SCM-simulate}{\code{SCM$simulate()}}
 \item \href{#method-SCM-clone}{\code{SCM$clone()}}
 }
 }
@@ -145,9 +190,9 @@ of the SCM including the missing data mechanism.}
 Create a new SCM object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SCM$new(
-  name,
-  uflist,
-  vflist,
+  name = "An SCM",
+  uflist = NULL,
+  vflist = NULL,
   rflist = NULL,
   rprefix = "R_",
   starsuffix = "_md"
@@ -159,9 +204,9 @@ Create a new SCM object.
 \describe{
 \item{\code{name}}{Name.}
 
-\item{\code{uflist}}{A named list containing the functions for latent variables.}
+\item{\code{uflist}}{A named list containing the functions for the background variables.}
 
-\item{\code{vflist}}{A named list containing the functions for observed variables.}
+\item{\code{vflist}}{A named list containing the functions for the observed variables.}
 
 \item{\code{rflist}}{A named list containing the functions for missingness indicators.}
 
@@ -227,7 +272,7 @@ Plot the DAG of the SCM object.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{subset}}{Variable groups to be plotted: "uvr","vr","uv", or "v".}
+\item{\code{subset}}{Variable groups to be plotted: "uvr", "u2vr","vr","uv", "u2v" or "v".}
 
 \item{\code{method}}{Plotting method: "qgraph" or "igraph".}
 
@@ -246,35 +291,152 @@ backdoor$plot("v")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SCM-intervene"></a>}}
-\if{latex}{\out{\hypertarget{method-SCM-intervene}{}}}
-\subsection{Method \code{intervene()}}{
-Apply an intervention to the SCM object.
+\if{html}{\out{<a id="method-SCM-tikz"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-tikz}{}}}
+\subsection{Method \code{tikz()}}{
+Return a TikZ code for drawing the DAG of the SCM object in LaTeX.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SCM$intervene(target, ifunction)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SCM$tikz(
+  subset = "uvr",
+  layoutfunction = igraph::layout_with_lgl,
+  labels = NULL,
+  settings = list(force = FALSE, borders = TRUE, shape = "circle", size = 5, scale = 2),
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{target}}{Name(s) of the variables in vflist to be intervened.}
+\item{\code{subset}}{Variable groups to be plotted: "uvr","vr","uv", or "v".}
 
-\item{\code{ifunction}}{Either numeric value(s) or new structural function(s) for the target variables.}
+\item{\code{layoutfunction}}{A layout function from igraph package.}
+
+\item{\code{labels}}{A named list that gives the names of vertices in TikZ.}
+
+\item{\code{settings}}{A list with the following elements:}
+
+\item{\code{...}}{Arguments to be passed to layoutfunction}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-pa"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-pa}{}}}
+\subsection{Method \code{pa()}}{
+Return the parents of a set of vertices.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$pa(vnames, includeself = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vnames}}{A vector of vertex names}
+
+\item{\code{includeself}}{Logical, should \code{vnames} to be included in the results (defaults TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-ch"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-ch}{}}}
+\subsection{Method \code{ch()}}{
+Return the children of a set of vertices.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$ch(vnames, includeself = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vnames}}{A vector of vertex names}
+
+\item{\code{includeself}}{Logical, should \code{vnames} to be included in the results (defaults TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-an"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-an}{}}}
+\subsection{Method \code{an()}}{
+Return the ancestors of a set of vertices.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$an(vnames, includeself = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vnames}}{A vector of vertex names}
+
+\item{\code{includeself}}{Logical, should \code{vnames} to be included in the results (defaults TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-de"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-de}{}}}
+\subsection{Method \code{de()}}{
+Return the descendants of a set of vertices.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$de(vnames, includeself = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vnames}}{A vector of vertex names}
+
+\item{\code{includeself}}{Logical, should \code{vnames} to be included in the results (defaults TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-add_variable"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-add_variable}{}}}
+\subsection{Method \code{add_variable()}}{
+Add a new variable to the SCM object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$add_variable(
+  vfnew = NULL,
+  ufnew = NULL,
+  rfnew = NULL,
+  rprefixnew = NULL,
+  starsuffixnew = NULL
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vfnew}}{NULL or a named list containing the functions for the new observed variables.}
+
+\item{\code{ufnew}}{NULL or a named list containing the functions for the new latent variables.}
+
+\item{\code{rfnew}}{NULL or a named list containing the functions for the new missingness indicators.}
+
+\item{\code{rprefixnew}}{NULL or the prefix of the missingness indicators.}
+
+\item{\code{starsuffixnew}}{NULL orthe suffix for variables with missing data.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# A simple intervention
-backdoor_x1 <- backdoor$clone()  # making a copy
-backdoor_x1$intervene("x",1) # applying the intervention
-backdoor_x1$plot() # to see that arrows incoming to x are cut
-
-# An intervention that redefines a structural equation
-backdoor_yz <- backdoor$clone()  # making a copy
-backdoor_yz$intervene("y",
-    function(uy, z) {return(as.numeric(uy < 0.1 + 0.8*z ))}) # making y a function of z only
-backdoor_yz$plot() # to see that arrow x -> y is cut
+\preformatted{backdoor2 <- backdoor$clone()
+backdoor2$add_variable(
+   vfnew = list(
+             w = function(uw, x) {
+             return(as.numeric(uw < 0.4 + 0.3*x))}),
+   ufnew = list(
+            uw = function(n) {return(stats::runif(n))})
+) 
 }
 \if{html}{\out{</div>}}
 
@@ -282,45 +444,27 @@ backdoor_yz$plot() # to see that arrow x -> y is cut
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SCM-simulate"></a>}}
-\if{latex}{\out{\hypertarget{method-SCM-simulate}{}}}
-\subsection{Method \code{simulate()}}{
-Simulate data from the SCM object.
-Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
-If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
+\if{html}{\out{<a id="method-SCM-remove_variable"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-remove_variable}{}}}
+\subsection{Method \code{remove_variable()}}{
+Remove variables from the SCM object.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SCM$simulate(
-  n = 1,
-  no_missing_data = FALSE,
-  seed = NULL,
-  fixedvars = NULL,
-  store_simdata = TRUE,
-  return_simdata = FALSE
-)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SCM$remove_variable(variablenames)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{n}}{Number of observations to be generated.}
-
-\item{\code{no_missing_data}}{Logical, should the generation of missing data skipped? (defaults FALSE).}
-
-\item{\code{seed}}{NULL or a number for \code{set.seed}.}
-
-\item{\code{fixedvars}}{List of variables that remain unchanged.}
-
-\item{\code{store_simdata}}{Logical, should the simulated data to be stored in the SCM object (defaults TRUE)}
-
-\item{\code{return_simdata}}{Logical, should the simulated data to be returned as the output (defaults FALSE)}
+\item{\code{variablenames}}{Names of the variables to be removed.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
-backdoor$simulate(10)
-backdoor$simdata
+\preformatted{backdoor2 <- backdoor$clone()
+backdoor2$remove_variable(c("uy","y"))
+#' @include R6causal.R R6causal_examples.R
+NULL
 }
 \if{html}{\out{</div>}}
 
@@ -399,6 +543,88 @@ An object of class \code{dosearch}.
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-intervene"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-intervene}{}}}
+\subsection{Method \code{intervene()}}{
+Apply an intervention to the SCM object.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$intervene(target, ifunction)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{target}}{Name(s) of the variables in vflist to be intervened.}
+
+\item{\code{ifunction}}{Either numeric value(s) or new structural function(s) for the target variables.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{# A simple intervention
+backdoor_x1 <- backdoor$clone()  # making a copy
+backdoor_x1$intervene("x",1) # applying the intervention
+backdoor_x1$plot() # to see that arrows incoming to x are cut
+
+# An intervention that redefines a structural equation
+backdoor_yz <- backdoor$clone()  # making a copy
+backdoor_yz$intervene("y",
+    function(uy, z) {return(as.numeric(uy < 0.1 + 0.8*z ))}) # making y a function of z only
+backdoor_yz$plot() # to see that arrow x -> y is cut
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-simulate"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-simulate}{}}}
+\subsection{Method \code{simulate()}}{
+Simulate data from the SCM object.
+Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
+If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$simulate(
+  n = 1,
+  no_missing_data = FALSE,
+  seed = NULL,
+  fixedvars = NULL,
+  store_simdata = TRUE,
+  return_simdata = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{n}}{Number of observations to be generated.}
+
+\item{\code{no_missing_data}}{Logical, should the generation of missing data skipped? (defaults FALSE).}
+
+\item{\code{seed}}{NULL or a number for \code{set.seed}.}
+
+\item{\code{fixedvars}}{List of variable names that remain unchanged or a data table/frame that contains the values of the fixed variables.}
+
+\item{\code{store_simdata}}{Logical, should the simulated data to be stored in the SCM object (defaults TRUE)}
+
+\item{\code{return_simdata}}{Logical, should the simulated data to be returned as the output (defaults FALSE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{backdoor$simulate(8, return_simdata = TRUE, store_simdata = FALSE)
+backdoor$simulate(10)
+backdoor$simdata
 }
 \if{html}{\out{</div>}}
 
