@@ -12,8 +12,7 @@
 #' 9) checking the identifiability in a missing data problem using the R package `dosearch`.
 #' In addition, there are functions for running experiments and doing counterfactual inference using simulation.
 #'
-#' @docType package
-#' @name R6causal
+#' @name R6causalimport
 #' @references
 #' J. Pearl (2009). Causality, 2nd edition, Cambridge University Press.
 #' @import R6
@@ -26,6 +25,7 @@
 #' @import igraph
 #' @import dosearch
 #' @import causaleffect
+#' @import cfid
 ## @import qgraph
 ## @import sqldf
 NULL
@@ -60,6 +60,7 @@ SCM <- R6::R6Class("SCM",
       .unames = NULL,
       .vnames = NULL,
       .rnames = NULL,
+      .vstarnames = NULL,
       .rnames_prefix = NULL,
       .rnames_target = NULL,
       .uvnames = NULL,
@@ -70,11 +71,12 @@ SCM <- R6::R6Class("SCM",
       .dedicated_u = NULL,
       .is_linear_gaussian = FALSE,
       .rmapping_from_prefix = NULL,
+      .vstarmapping_from_prefix = NULL,
       .rmapping_to_prefix = NULL,
       .vfsymb = NULL,
       .vrfsymb = NULL,
       .simdata = NULL,
-      .simdata_md = NULL,
+      .simdata_obs = NULL,
       .adjmatrix = NULL,
       .igraph = NULL,
       .igraph_nodedicated = NULL,
@@ -191,6 +193,8 @@ SCM <- R6::R6Class("SCM",
           names(private$.rflist_prefix) <- private$.rnames
           private$.rmapping_from_prefix <- as.list(names(private$.rflist))
           names(private$.rmapping_from_prefix) <- private$.rnames
+          private$.vstarmapping_from_prefix <- paste0(private$.rmapping_from_prefix, private$.starsuffix)
+          names(private$.vstarmapping_from_prefix) <- private$.rnames
           private$.rmapping_to_prefix <- as.list(private$.rnames)
           names(private$.rmapping_to_prefix) <- names(private$.rflist)
           private$.vrflist <- c(private$.vflist, private$.rflist_prefix)
@@ -283,6 +287,14 @@ SCM <- R6::R6Class("SCM",
           private$.vnames
         } else {
           stop("`$vnames` is read only", call. = FALSE)
+        }
+      },
+      #' @field vstarnames List of the names of observed variables with NA's.
+      vstarnames = function(value) {
+        if (missing(value)) {
+          private$.vstarnames
+        } else {
+          stop("`$vstarnames` is read only", call. = FALSE)
         }
       },
       #' @field vfsymb List of the arguments of structural functions of observed variables.
@@ -390,13 +402,13 @@ SCM <- R6::R6Class("SCM",
           self
         }
       },
-      #' @field simdata_md Data table containing data simulated from the SCM
+      #' @field simdata_obs Data table containing data simulated from the SCM
       #' where missing values are indicated by \code{NA}.
-      simdata_md = function(value) {
+      simdata_obs = function(value) {
         if (missing(value)) {
-          private$.simdata_md
+          private$.simdata_obs
         } else {
-          stop("`$simdata_md` is read only", call. = FALSE)
+          stop("`$simdata_obs` is read only", call. = FALSE)
         }
       },
       #' @field igraph The graph of the SCM in the \code{igraph} form
@@ -903,14 +915,14 @@ causal.effect = function(y,x,...) {
 #' @description
 #' Is a causal effect or other query identifiable from given data sources?
 #' Calls \code{\link[dosearch]{dosearch}} from the package \pkg{dosearch}.
-#' See the documentation of dosearch for the details.
+#' See the documentation of \pkg{dosearch} for the details.
 #' @param data Character string specifying the data sources.
 #' @param query  Character string specifying the query of interest.
 #' @param transportability Other parameters passed to \code{dosearch()}.
 #' @param selection_bias Other parameters passed to \code{dosearch()}.
 #' @param missing_data Other parameters passed to \code{dosearch()}.
 #' @param control List of control parameters passed to \code{dosearch()}.
-#' @return An object of class \code{dosearch}.
+#' @return An object of class \code{dosearch::dosearch}.
 #' @examples
 #' backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 #SCM$set("public", "dosearch", 
@@ -929,9 +941,27 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
                              transportability = transportability, selection_bias = selection_bias,
                              missing_data = missing_data, control = control))
 },
+#' @description
+#' Is a counterfactual query identifiable from given data sources?
+#' Calls \code{identifiable} from the package \pkg{cfid}.
+#' See the documentation of \pkg{cfid} for the details.
+#' @param gamma An R object that can be coerced into a \code{cfid::counterfactual_conjunction} object that represents the counterfactual causal query.
+#' @param ... Other arguments passed to \code{cfid::identifiable}.
+#' @return An object of class \code{cfid::query}.
+#' @examples
+#' backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) ) 
+#SCM$set("public", "cfid", 
+cfid = function(gamma,...) {
+  if (!requireNamespace("cfid", quietly = TRUE)) {
+    stop("Package \"cfid\" is needed to call method \"cfid\". Please install it.",
+         call. = FALSE)
+  }
+  cfid_dag <- cfid::import_graph(private$.graphtext)
+  return( cfid::identifiable(g = cfid_dag, gamma = gamma, ...))
+},
      #' @description
      #' Apply an intervention to the SCM object.
-     #' @param target Name(s) of the variables in vflist to be intervened.
+     #' @param target Name(s) of the variables (in vflist, uflist or rflist) to be intervened.
      #' @param ifunction Either numeric value(s) or new structural function(s) for the target variables.
      #' @examples
      #' # A simple intervention
@@ -945,23 +975,27 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
      #'     function(uy, z) {return(as.numeric(uy < 0.1 + 0.8*z ))}) # making y a function of z only
      #' backdoor_yz$plot() # to see that arrow x -> y is cut
      intervene = function(target, ifunction) {
-        #Only interventions to v variables are currently implemented
         if(length(target) != length(ifunction)) {
             stop("The lengths of 'target' and 'ifunction' must be equal.")
         }
-        if( length(target) > 1) {
+       if(length(ifunction) == 1) ifunction <- list(ifunction)
           for(i in 1:length(target)) {
-            private$.vflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+            if(target[[i]] %in% private$.vnames) {
+                private$.vflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+            } else if(target[[i]] %in% private$.unames) {
+              private$.uflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+            } else if(target[[i]] %in% private$.rnames) {
+              private$.rflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+            } else {
+              stop(paste("Unknown variable name:", target[[i]]))
+            }
           }
-        } else {
-          private$.vflist[[ target ]] <- private$.parsefunction(ifunction)
-        }
         private$.derive_graph()
       },
      #' @description
      #' Simulate data from the SCM object.
      #' Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
-     #' If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
+     #' If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_obs}
      #' @param n Number of observations to be generated.
      #' @param no_missing_data Logical, should the generation of missing data skipped? (defaults FALSE).
      #' @param seed NULL or a number for \code{set.seed}.
@@ -982,7 +1016,7 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
         if(!is.null(seed)) set.seed(seed)
         if( is.null(fixedvars) | fixedvars_as_data) {
             private$.simdata <- data.table::data.table(matrix(as.numeric(NA), ncol = private$.num_uv, nrow = n))
-            data.table::setnames(private$.simdata,private$.uvnames)
+            data.table::setnames(private$.simdata, private$.uvnames)
         } 
         for (i in 1:private$.num_u) {
             varchr <- private$.unames[i]
@@ -991,9 +1025,6 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
                 if(!fixedvars_as_data) next
                 if(fixedvars_as_data) {
                   data.table::set(private$.simdata, j = varchr, value = fixedvars[, ..varchr])
-                  # testtry <- try(set(simdata, j = varchr, value = fixedvars[, ..varchr]))
-                  # if(inherits(testtry, "try-error")) browser()
-                  #next
                 } 
               } else {
                 data.table::set(private$.simdata, j = varchr, value = private$.uflist[[i]](n = n))
@@ -1015,10 +1046,15 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
             }
             arguments <- names(formals(private$.vflist[[ varchr ]]))
             if( identical(arguments,"...")) {
-              data.table::set(private$.simdata, j = varchr, value = private$.vflist[[ varchr ]]())
+              testtry <- try(data.table::set(private$.simdata, j = varchr, value = private$.vflist[[ varchr ]]()))
             } else {
-              data.table::set(private$.simdata, j = varchr, value = do.call( private$.vflist[[ varchr ]],
-                                                                            private$.simdata[ , ..arguments]))
+              testtry <- try(data.table::set(private$.simdata, j = varchr, value = do.call( private$.vflist[[ varchr ]],
+                                                                            private$.simdata[ , ..arguments])))
+            }
+            if(inherits(testtry, "try-error")) {
+              errormessage <- paste("Method simulate() failed when processing variable", 
+                                  varchr,".", "The lower level error message was: ",testtry)
+              stop(errormessage)
             }
           }
         data.table::setattr(private$.simdata, "SCMname", private$.name) 
@@ -1033,26 +1069,23 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
           return(private$.simdata) 
         }
         if(!no_missing_data & !is.null(private$.rflist)) {
-          private$.simdata_md <- data.table::copy(private$.simdata)
-          if( is.null(fixedvars) | !any(private$.rnames %in% fixedvarnames)) {
-            private$.simdata_md[, c(private$.rnames) := NA]
-          } 
-
+          private$.vstarnames <- paste0(private$.vnames, private$.starsuffix)
+          private$.simdata[, c(private$.vstarnames)] <- private$.simdata[, private$.vnames, with = FALSE]
           for(i in 1:private$.num_r) {
             varchr <- private$.toporderr_md[i]
             if( !is.null(fixedvars)) {
-              if((varchr %in% fixedvarnames)) { 
+              if((varchr %in% fixedvarnames)) {
                 if(!fixedvars_as_data) next
                 if(fixedvars_as_data) {
-                  data.table::set(private$.simdata_md, j = varchr, value = fixedvars[, ..varchr])
+                  data.table::set(private$.simdata, j = varchr, value = fixedvars[, ..varchr])
                   next
                 }
               }
             }
             arguments <- names(formals(private$.rflist_prefix[[ varchr ]]))
             TF_md <- as.logical( do.call( private$.rflist_prefix[[ varchr ]],
-                                          private$.simdata_md[ , ..arguments, drop=FALSE]))
-            data.table::set(private$.simdata_md, j = varchr, value = as.numeric(TF_md))
+                                          private$.simdata[ , ..arguments, drop=FALSE]))
+            data.table::set(private$.simdata, j = varchr, value = as.numeric(TF_md))
           }
           # Setting the value of an observed variable as NA if the missing indicator == 0
           #  which(! simdata_md[,j = ..varchr] ) tells the rows where this condition holds.
@@ -1061,11 +1094,14 @@ dosearch = function(data, query, transportability = NULL, selection_bias = NULL,
             if( !is.null(fixedvars)) {
               if((varchr %in% fixedvarnames)) next
             }
-            data.table::set(private$.simdata_md, i = which(! private$.simdata_md[,j = ..varchr] ) , j = private$.rmapping_from_prefix[[ varchr ]], value = NA)
+            data.table::set(private$.simdata, i = which(! private$.simdata[,j = ..varchr] ), 
+                            j = private$.vstarmapping_from_prefix[[ varchr ]], value = NA)
           }
+          private$.simdata_obs <- private$.simdata[, c(private$.vstarnames, private$.rnames), with = FALSE]
         }
+
         if(return_simdata & !no_missing_data & !is.null(private$.rflist)) {
-          return(list( simdata = private$.simdata, simdata_md = private$.simdata_md)) 
+          return(list( simdata = private$.simdata, simdata_obs = private$.simdata_obs)) 
         }
       }
     )

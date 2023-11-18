@@ -5,7 +5,7 @@
 \alias{credit}
 \title{SCM "credit" used in the credit scoring example.}
 \format{
-An object of class \code{SCM} (inherits from \code{R6}) of length 40.
+An object of class \code{SCM} (inherits from \code{R6}) of length 42.
 }
 \usage{
 credit

@@ -60,6 +60,7 @@ plot(backdoor_parallel)
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="add_variable"><a href='../../R6causal/html/SCM.html#method-SCM-add_variable'><code>R6causal::SCM$add_variable()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="an"><a href='../../R6causal/html/SCM.html#method-SCM-an'><code>R6causal::SCM$an()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="causal.effect"><a href='../../R6causal/html/SCM.html#method-SCM-causal.effect'><code>R6causal::SCM$causal.effect()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="cfid"><a href='../../R6causal/html/SCM.html#method-SCM-cfid'><code>R6causal::SCM$cfid()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="ch"><a href='../../R6causal/html/SCM.html#method-SCM-ch'><code>R6causal::SCM$ch()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="de"><a href='../../R6causal/html/SCM.html#method-SCM-de'><code>R6causal::SCM$de()</code></a></span></li>
 <li><span class="pkg-link" data-pkg="R6causal" data-topic="SCM" data-id="dosearch"><a href='../../R6causal/html/SCM.html#method-SCM-dosearch'><code>R6causal::SCM$dosearch()</code></a></span></li>

@@ -1,7 +1,7 @@
 ---
 title: "Using R6causal"
 author: "Juha Karvanen"
-date: "2022-11-03"
+date: "2023-11-18"
 output: rmarkdown::pdf_document
 vignette: >
   %\VignetteIndexEntry{using_R6causal}
@@ -31,6 +31,7 @@ The class contains methods for
 * defining the missing data mechanism 
 * simulating incomplete data from the model according to the specified missing data mechanism 
 * checking the identifiability in a missing data problem using the R package `dosearch`  
+* checking the identifiability of a counterfactual query using the R package `cfid` 
 
 In addition, there are functions for
 
@@ -47,6 +48,7 @@ The class `LinearGaussianSCM` inherits `SCM` and defines a structural causal mod
 library(R6causal)
 library(data.table)
 library(stats)
+data.table::setDTthreads(2)
 ```
 
 # Defining the model
@@ -222,11 +224,12 @@ str(backdoor_experiment)
 colMeans(backdoor_experiment$response_list$y)
 ```
 
-# Applying the ID algorithm and Do-search
-There are direct plugins to R packages `causaleffect` and `dosearch` that can be used to solve identifiability problems.
+# Applying the ID algorithm, Do-search and cfid
+There are direct plugins to R packages `causaleffect`, `dosearch` and `cfid` that can be used to solve identifiability problems.
 ```{r IDbackdoor}
 backdoor$causal.effect(y = "y", x = "x")
 backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
+backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) ) 
 ```
 
 # Counterfactual inference (a simple case)
@@ -341,18 +344,18 @@ if (!requireNamespace("qgraph", quietly = TRUE)) backdoor_md$plot(method = "qgra
 
 # Simulating incomplete data
 
-By default both complete data and incomplete data are simulated. The incomplete dataset is named as `$simdata_md`.
+By default both complete data and incomplete data are simulated. The incomplete dataset is named as `$simdata_obs`.
 ```{r backdoor_md_simulate}
 backdoor_md$simulate(100)
 summary(backdoor_md$simdata)
-summary(backdoor_md$simdata_md)
+summary(backdoor_md$simdata_obs)
 ```
 
 By using the argument `fixedvars` one can keep the complete data unchanged and re-simulate the missing data mechanism. 
 ```{r backdoor_md_simulate2}
 backdoor_md$simulate(100, fixedvars = c("x","y","z","ux","uy","uz"))
 summary(backdoor_md$simdata)
-summary(backdoor_md$simdata_md)
+summary(backdoor_md$simdata_obs)
 ```
 
 ## Applying Do-search to a missing data problem

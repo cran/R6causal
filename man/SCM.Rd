@@ -77,6 +77,12 @@ NULL
 backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
 
 ## ------------------------------------------------
+## Method `SCM$cfid`
+## ------------------------------------------------
+
+backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) ) 
+
+## ------------------------------------------------
 ## Method `SCM$intervene`
 ## ------------------------------------------------
 
@@ -106,6 +112,8 @@ backdoor$simdata
 
 \item{\code{vnames}}{List of the names of observed variables.}
 
+\item{\code{vstarnames}}{List of the names of observed variables with NA's.}
+
 \item{\code{vfsymb}}{List of the arguments of structural functions of observed variables.}
 
 \item{\code{uflist}}{List of the structural functions of unobserved variables.}
@@ -133,7 +141,7 @@ and Gaussian background variables?}
 
 \item{\code{simdata}}{Data table containing data simulated from the SCM.}
 
-\item{\code{simdata_md}}{Data table containing data simulated from the SCM
+\item{\code{simdata_obs}}{Data table containing data simulated from the SCM
 where missing values are indicated by \code{NA}.}
 
 \item{\code{igraph}}{The graph of the SCM in the \code{igraph} form
@@ -178,6 +186,7 @@ of the SCM including the missing data mechanism.}
 \item \href{#method-SCM-remove_variable}{\code{SCM$remove_variable()}}
 \item \href{#method-SCM-causal.effect}{\code{SCM$causal.effect()}}
 \item \href{#method-SCM-dosearch}{\code{SCM$dosearch()}}
+\item \href{#method-SCM-cfid}{\code{SCM$cfid()}}
 \item \href{#method-SCM-intervene}{\code{SCM$intervene()}}
 \item \href{#method-SCM-simulate}{\code{SCM$simulate()}}
 \item \href{#method-SCM-clone}{\code{SCM$clone()}}
@@ -508,7 +517,7 @@ the intervention on the set of variables (x) conditional on (z) if the effect is
 \subsection{Method \code{dosearch()}}{
 Is a causal effect or other query identifiable from given data sources?
 Calls \code{\link[dosearch]{dosearch}} from the package \pkg{dosearch}.
-See the documentation of dosearch for the details.
+See the documentation of \pkg{dosearch} for the details.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SCM$dosearch(
   data,
@@ -538,11 +547,43 @@ See the documentation of dosearch for the details.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-An object of class \code{dosearch}.
+An object of class \code{dosearch::dosearch}.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SCM-cfid"></a>}}
+\if{latex}{\out{\hypertarget{method-SCM-cfid}{}}}
+\subsection{Method \code{cfid()}}{
+Is a counterfactual query identifiable from given data sources?
+Calls \code{identifiable} from the package \pkg{cfid}.
+See the documentation of \pkg{cfid} for the details.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SCM$cfid(gamma, ...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{gamma}}{An R object that can be coerced into a \code{cfid::counterfactual_conjunction} object that represents the counterfactual causal query.}
+
+\item{\code{...}}{Other arguments passed to \code{cfid::identifiable}.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+An object of class \code{cfid::query}.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) ) 
 }
 \if{html}{\out{</div>}}
 
@@ -561,7 +602,7 @@ Apply an intervention to the SCM object.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{target}}{Name(s) of the variables in vflist to be intervened.}
+\item{\code{target}}{Name(s) of the variables (in vflist, uflist or rflist) to be intervened.}
 
 \item{\code{ifunction}}{Either numeric value(s) or new structural function(s) for the target variables.}
 }
@@ -591,7 +632,7 @@ backdoor_yz$plot() # to see that arrow x -> y is cut
 \subsection{Method \code{simulate()}}{
 Simulate data from the SCM object.
 Returns simulated data as a data.table and/or creates or updates \code{simdata} in the SCM object.
-If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_md}
+If \code{no_missing_data = FALSE}, creates or updates also \code{simdata_obs}
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SCM$simulate(
   n = 1,

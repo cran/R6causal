@@ -1,7 +1,7 @@
 Package: R6causal
 Type: Package
 Title: R6 Class for Structural Causal Models
-Version: 0.8.0
+Version: 0.8.1
 Authors@R: person("Juha", "Karvanen", email = "juha.karvanen@iki.fi",
                   role = c("aut", "cre"), comment = c(ORCID = "0000-0001-5530-769X")) 
 Maintainer: Juha Karvanen <juha.karvanen@iki.fi>
@@ -9,14 +9,15 @@ Description: The implemented R6 class 'SCM' aims to simplify working with struct
 License: AGPL-3
 Encoding: UTF-8
 RoxygenNote: 7.2.3
-Imports: causaleffect, data.table, dosearch, igraph, R6, stats, MASS
+Imports: causaleffect, cfid, data.table, dosearch, glue, igraph, R6,
+        stats, MASS
 Suggests: rmarkdown, knitr, qgraph, sqldf
 VignetteBuilder: knitr
 NeedsCompilation: no
-Collate: 'R6causal_utils.R' 'R6causal.R' 'R6causal_examples.R'
-        'R6causal_counterfactual.R' 'R6causal_functions.R'
-        'R6causal_linear.R'
-Packaged: 2023-06-12 17:34:55 UTC; juhak
+Collate: 'R6causal-package.R' 'R6causal_utils.R' 'R6causal.R'
+        'R6causal_examples.R' 'R6causal_counterfactual.R'
+        'R6causal_functions.R' 'R6causal_linear.R'
+Packaged: 2023-11-18 19:59:21 UTC; juhak
 Author: Juha Karvanen [aut, cre] (<https://orcid.org/0000-0001-5530-769X>)
 Repository: CRAN
-Date/Publication: 2023-06-12 19:20:05 UTC
+Date/Publication: 2023-11-18 20:10:02 UTC

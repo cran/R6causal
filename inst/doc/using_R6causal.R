@@ -1,4 +1,4 @@
-## ---- include = FALSE---------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
@@ -8,6 +8,7 @@ knitr::opts_chunk$set(
 library(R6causal)
 library(data.table)
 library(stats)
+data.table::setDTthreads(2)
 
 ## ----definebackdoor-----------------------------------------------------------
 backdoor <- SCM$new("backdoor",
@@ -135,6 +136,7 @@ colMeans(backdoor_experiment$response_list$y)
 ## ----IDbackdoor---------------------------------------------------------------
 backdoor$causal.effect(y = "y", x = "x")
 backdoor$dosearch(data = "p(x,y,z)", query = "p(y|do(x))")
+backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) ) 
 
 ## ----counterfactualbackdoor---------------------------------------------------
 cfdata <- counterfactual(backdoor, situation = list(do = list(target = "x", ifunction = 0), 
@@ -223,12 +225,12 @@ if (!requireNamespace("qgraph", quietly = TRUE)) backdoor_md$plot(method = "qgra
 ## ----backdoor_md_simulate-----------------------------------------------------
 backdoor_md$simulate(100)
 summary(backdoor_md$simdata)
-summary(backdoor_md$simdata_md)
+summary(backdoor_md$simdata_obs)
 
 ## ----backdoor_md_simulate2----------------------------------------------------
 backdoor_md$simulate(100, fixedvars = c("x","y","z","ux","uy","uz"))
 summary(backdoor_md$simdata)
-summary(backdoor_md$simdata_md)
+summary(backdoor_md$simdata_obs)
 
 ## ----backdoor_md_dosearch-----------------------------------------------------
 backdoor_md$dosearch(data = "p(x*,y*,z*,r_x,r_y,r_z)", query = "p(y|do(x))")
