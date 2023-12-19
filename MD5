@@ -1,8 +1,8 @@
-a46d06d300bf00cd84e8fed0526969ca *DESCRIPTION
+01d8c5e4aa95ffdb41c9f0ef3631b190 *DESCRIPTION
 f15ff6fa1e4629628b72a730b0f1f50b *NAMESPACE
-682a58bf962ae6e6334ce4c3301ec1da *NEWS.md
+f356dfe0519c1def80158f3126479346 *NEWS.md
 fd813ac29a05fc3af98f60a0f81fe23c *R/R6causal-package.R
-c53f7a25e2362102a7e23990931941b6 *R/R6causal.R
+3400b4dc85374bc1c52263f08e01aecc *R/R6causal.R
 5df16641bc6aa7d8f69f2bfa75a2157c *R/R6causal_counterfactual.R
 292f657202be82be5137b62d7f03d388 *R/R6causal_examples.R
 94f7f9d14e0cf863b12f2eab1d85b04e *R/R6causal_functions.R
@@ -12,7 +12,7 @@ e57999540a9664e18ae730689d548507 *README.md
 4c968c4129f762c82183c64d60072f4d *build/vignette.rds
 57916e9ee03aa095fd85f83f7d4cf45e *inst/doc/using_R6causal.R
 59452a5275db5a5267171ca81918e7f8 *inst/doc/using_R6causal.Rmd
-f8642fd8aa5bb7aa3d43ba7d2ea3f234 *inst/doc/using_R6causal.pdf
+0b11dbf7c9a9ae6f166142a5d9d474ed *inst/doc/using_R6causal.pdf
 8f2c96f8ef28bc6810137a7eb3b9e4b0 *man/LinearGaussianSCM.Rd
 18bfe6451fabf60a1e271492697a231d *man/ParallelWorld.Rd
 363346cb2d87274871d8191035be0b2e *man/R6causal-package.Rd

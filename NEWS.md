@@ -1,3 +1,7 @@
+# R6causal 0.8.2
+
+* Fixed a bug in the interventions to missingness indicators (`rflist`).
+
 # R6causal 0.8.1
 
 * The content of `simdata` and `simdata_obs` revised when missing data mechanism is present. 

@@ -983,14 +983,15 @@ cfid = function(gamma,...) {
             if(target[[i]] %in% private$.vnames) {
                 private$.vflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
             } else if(target[[i]] %in% private$.unames) {
-              private$.uflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+                private$.uflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
             } else if(target[[i]] %in% private$.rnames) {
-              private$.rflist[[ target[[i]]]] <- private$.parsefunction( ifunction[[i]])
+                rtarget <- sub(paste0("^", private$.rprefix), "", target[[i]]) 
+                private$.rflist[[ rtarget ]] <- private$.parsefunction( ifunction[[i]])
             } else {
               stop(paste("Unknown variable name:", target[[i]]))
             }
           }
-        private$.derive_graph()
+        private$.derive_SCM()
       },
      #' @description
      #' Simulate data from the SCM object.
@@ -1079,13 +1080,26 @@ cfid = function(gamma,...) {
                 if(fixedvars_as_data) {
                   data.table::set(private$.simdata, j = varchr, value = fixedvars[, ..varchr])
                   next
+                  }
                 }
               }
-            }
-            arguments <- names(formals(private$.rflist_prefix[[ varchr ]]))
-            TF_md <- as.logical( do.call( private$.rflist_prefix[[ varchr ]],
-                                          private$.simdata[ , ..arguments, drop=FALSE]))
-            data.table::set(private$.simdata, j = varchr, value = as.numeric(TF_md))
+              arguments <- names(formals(private$.rflist_prefix[[ varchr ]]))
+              if( identical(arguments,"...")) {
+                testtry <- try(data.table::set(private$.simdata, j = varchr, 
+                                value = as.numeric(as.logical( private$.rflist_prefix[[ varchr ]]()))))
+              } else {
+                testtry <- try(data.table::set(private$.simdata, j = varchr, 
+                                value = as.numeric(as.logical(do.call( private$.rflist_prefix[[ varchr ]],
+                                private$.simdata[ , ..arguments, drop = FALSE])))))
+              }
+              if(inherits(testtry, "try-error")) {
+                errormessage <- paste("Method simulate() failed when processing missingness indicator", 
+                                      varchr,".", "The lower level error message was: ",testtry)
+                stop(errormessage)
+              }
+            # TF_md <- as.logical( do.call( private$.rflist_prefix[[ varchr ]],
+            #                               private$.simdata[ , ..arguments, drop=FALSE]))
+            # data.table::set(private$.simdata, j = varchr, value = as.numeric(TF_md))
           }
           # Setting the value of an observed variable as NA if the missing indicator == 0
           #  which(! simdata_md[,j = ..varchr] ) tells the rows where this condition holds.
