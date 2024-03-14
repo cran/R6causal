@@ -1,3 +1,7 @@
+# R6causal 0.8.3
+
+* Changed the parameters of functions `counterfactual` and `fairness`. Now the method to simulate counterfactuals must be always specified by the user and `condition_type` is required if the method is "u_find".
+
 # R6causal 0.8.2
 
 * Fixed a bug in the interventions to missingness indicators (`rflist`).

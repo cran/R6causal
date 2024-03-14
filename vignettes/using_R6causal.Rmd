@@ -1,7 +1,7 @@
 ---
 title: "Using R6causal"
 author: "Juha Karvanen"
-date: "2023-11-18"
+date: "2024-03-14"
 output: rmarkdown::pdf_document
 vignette: >
   %\VignetteIndexEntry{using_R6causal}
@@ -242,7 +242,7 @@ the response Y = 1? We estimate this probability by means of simulation.
 cfdata <- counterfactual(backdoor, situation = list(do = list(target = "x", ifunction = 0), 
                                                     condition = data.table( x = 0, y = 0)), 
                          target = "x", ifunction = 1, n = 100000, 
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y)
 ```
 The result differs from P(Y = 1 | do(X = 1))
@@ -279,7 +279,7 @@ cfdata <- counterfactual(backdoor_parallel,
                          target = "x",
                          ifunction = 1,
                          n = 100000,
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y)
 ```
 The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.
@@ -302,7 +302,7 @@ cfdata <- counterfactual(backdoor_parallel2,
                             do = NULL,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
                          n = 100000, 
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y_3)
 ```
 The printed value is a simulation based estimate for the counterfactual probability $P(Y=1)$.

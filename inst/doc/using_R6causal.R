@@ -142,7 +142,7 @@ backdoor$cfid(gamma = cfid::conj(cfid::cf("Y",0), cfid::cf("X",0, c(Z=1))) )
 cfdata <- counterfactual(backdoor, situation = list(do = list(target = "x", ifunction = 0), 
                                                     condition = data.table( x = 0, y = 0)), 
                          target = "x", ifunction = 1, n = 100000, 
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y)
 
 ## ----counterfactualcomparisonbackdoor-----------------------------------------
@@ -170,7 +170,7 @@ cfdata <- counterfactual(backdoor_parallel,
                          target = "x",
                          ifunction = 1,
                          n = 100000,
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y)
 
 ## ----parallelworldbackdoor2---------------------------------------------------
@@ -190,7 +190,7 @@ cfdata <- counterfactual(backdoor_parallel2,
                             do = NULL,
                             condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
                          n = 100000, 
-                         control = list(method = "rejection"))
+                         method = "rejection")
 mean(cfdata$y_3)
 
 ## ----definebackdoor_md--------------------------------------------------------

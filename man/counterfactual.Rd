@@ -10,6 +10,7 @@ counterfactual(
   n,
   target = NULL,
   ifunction = NULL,
+  method = NULL,
   returnscm = FALSE,
   control = NULL
 )
@@ -25,6 +26,7 @@ specify the intervention carried out in the situation
 'ifunction' that specify the intervention carried out in each parallel world
 \item condition : either a string that gives an SQL query ( e.g. "select x,y,z from DATA where" )
 or a data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))
+\item condition_type : (required only if method == "u_find") A character vector giving the type ("continuous" or "discrete") of every variable in \code{situation$condition}
 }}
 
 \item{n}{The number of rows in the data to be simulated}
@@ -34,19 +36,20 @@ variable(s) of the counterfactual intervention.}
 
 \item{ifunction}{NULL or a list of functions for the counterfactual intervention.}
 
+\item{method}{The simulation method, "u_find", "rejection" or "analytic_linear_gaussian"}
+
 \item{returnscm}{A logical, should the internally created twin SCM or parallel 
 world SCM returned?}
 
 \item{control}{List of parameters to be passed to the simulation method:
 \itemize{
-\item method:  "u_find" (default), "rejection" or "analytic_linear_gaussian"
-\item batchsize: (u_find) The size of data from n observations are resampled (default n)
-\item condition_type: (u_find) A character vector giving the type ("continuous" or "discrete") of every variable in \code{situation$condition}
+\item batchsize: (u_find, rejection) The size of data from n observations are resampled (default n)
 \item max_iterations: (u_find) The maximum number of iterations for the binary search (default 50)
 \item minu: (u_find) A scalar or a named list that specifies the lower starting value for the binary search (default -10)
 \item maxu: (u_find) A scalar or a named list that specifies the upper starting value for the binary search (default 10)
 \item sampling_replace: (u_find) Logical, resampling with replacement? (default TRUE)
 \item nonunique_jittersd: (u_find) Standard deviation of the noise to be added to the output (default NULL meaning no noise)
+\item maxbatchs: (u_find, rejection) The maximum number of batches for rejection sampling (for discrete variables)
 \item weightfunction: (u_find) A function or a named list of functions to be applied to dedicated error terms to obtain the resampling weights (default stats::dnorm)
 }}
 }
@@ -63,7 +66,7 @@ cfdata <- counterfactual(backdoor,
                              condition = data.table::data.table( x = 0, y = 0)),
                          target = "x",
                          ifunction = 1,
-                         control = list(method = "rejection"),
+                         method = "rejection",
                          n = 1000)
 mean(cfdata$y)
 
@@ -79,7 +82,7 @@ cfdata2 <- counterfactual(backdoor_parallel,
                              condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
                          target = "x",
                          ifunction = 1,
-                         control = list(method = "rejection"),
+                         method = "rejection",
                          n = 1000)
 mean(cfdata2$y)
 }

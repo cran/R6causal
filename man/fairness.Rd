@@ -9,11 +9,13 @@ fairness(
   scm,
   sensitive,
   condition,
+  condition_type,
   parents,
   n,
   sens_values = NULL,
   modeltype = "predict",
-  control = list(),
+  method,
+  control = NULL,
   ...
 )
 }
@@ -26,13 +28,17 @@ fairness(
 
 \item{condition}{A data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))}
 
+\item{condition_type}{(required only if method == "u_find") A character vector giving the type ("continuous" or "discrete") of every variable in \code{condition}}
+
 \item{parents}{A character vector of the names of variables that remain fixed}
 
 \item{n}{The number of rows in the data to be simulated by \code{counterfactual}}
 
 \item{sens_values}{A data.table specifying the combinations of the values of sensitive variables to be considered (default NULL meaning the all possible combinations of the values of sensitive variables)}
 
-\item{modeltype}{"predict" or "function" depending on the type \code{modellist}}
+\item{modeltype}{"predict" (default) or "function" depending on the type \code{modellist}}
+
+\item{method}{The simulation method, "u_find", "rejection" or "analytic_linear_gaussian"}
 
 \item{control}{List of parameters to be passed to the simulation method, see \code{counterfactual}.}
 
@@ -55,11 +61,11 @@ fairlist <- fairness(modellist = list(m1,m2),
                      sensitive = c("x"),
                      sens_values = data.table::data.table(x=c(0,1)),
                      condition = newd[1,c("x","y")],
+                     condition_type = list(x = "cont",
+                                           z = "cont",
+                                           y = "cont"),
                      parents = NULL,
                      n = 20,
                      modeltype = "predict",
-                     control = list(method = "u_find",
-                                    condition_type = list(x = "cont",
-                                                          z = "cont",
-                                                          y = "cont")))
+                     method = "u_find")
 }

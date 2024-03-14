@@ -210,7 +210,7 @@ makelist <- function(x,targetnames) {
 u_find <- function(twin, situation, n, control) {
   batchsize <- control$batchsize 
   nonunique_jittersd <- control$nonunique_jittersd
-  condition_type <- control$condition_type
+  condition_type <- situation$condition_type
   weightfunction <- control$weightfunction
   minu <- control$minu
   maxu <- control$maxu
@@ -226,8 +226,7 @@ u_find <- function(twin, situation, n, control) {
   }
   variables_processed <- NULL
   if(is.null(condition_type)) {
-    condition_type <- rep("cont", length(targetnames))
-    names(condition_type) <- targetnames
+    stop(" situation$condition_type must be specified as a character vector giving the type ('continuous' or 'discrete') of every variable situation$condition." )
   }
   weightfunctionlist <- makelist(weightfunction, targetnames)
   minulist <- makelist(minu, targetnames)
@@ -257,7 +256,7 @@ u_find <- function(twin, situation, n, control) {
                             minu = minulist[[ targetnames[[k]]]], 
                             maxu = maxulist[[ targetnames[[k]]]])
       }
-      if(condition_type[[ targetnames[[k]] ]] %in% c("discrete","categorical")) {
+      if( matched_condition_type %in% c("discrete","categorical")) {
         discrete_sampling_onecondition(twin, situation = targetsituation[[k]], 
                                         fixedvars = union(variables_processed, twin$de(targetnames[[k]])), 
                                         n = nrow(twin$simdata), control)
@@ -287,17 +286,46 @@ u_find <- function(twin, situation, n, control) {
 }
 
 
+# discrete_sampling_onecondition <- function(twin, situation, fixedvars = NULL, n, control) {
+#   twin$simulate(n = n, fixedvars = fixedvars)
+#   validdata <- merge( twin$simdata, situation$condition, by = names(situation$condition), allow.cartesian = TRUE)
+#   if(nrow(validdata) == 0) {
+#     stop(paste("Could not find any valid values of background variables when processing condition",names(situation$condition),"=",situation$condition))
+#   }
+#   valid_ind <- sample.int(nrow(validdata), size = n, replace = TRUE)
+#   twin$simdata <- validdata[valid_ind,]
+#   twin$simulate(n = n, fixedvars = twin$unames)
+#   return(twin$simdata)
+# }
+
 discrete_sampling_onecondition <- function(twin, situation, fixedvars = NULL, n, control) {
-  twin$simulate(n = n, fixedvars = fixedvars)
-  validdata <- merge( twin$simdata, situation$condition, by = names(situation$condition), allow.cartesian = TRUE)
-  if(nrow(validdata) == 0) {
+  # \itemize{
+  # \item batchsize A scalar, the number of rows to be simulated for a batch (rejection sampling)
+  # \item maxbatchs A scalar, the maximum number of batchs (rejection sampling)
+  # }
+  batchsize <- control$batchsize
+  maxbatchs <- control$maxbatchs
+  if(is.null(batchsize )) batchsize <- n
+  if(is.null(maxbatchs )) maxbatchs <- 1
+  twin$simulate(n = batchsize, fixedvars = fixedvars)
+  cf_data <- merge( twin$simdata, situation$condition, by = names(situation$condition), allow.cartesian = TRUE)
+  batchi <- 2
+  while( nrow(cf_data) < n & batchi <= maxbatchs) {
+    twin$simulate(n = batchsize, fixedvars = fixedvars)
+    validdata <- merge( twin$simdata, situation$condition, by = names(situation$condition), allow.cartesian = TRUE)
+    cf_data <- rbind(cf_data, validdata)
+    batchi <- batchi + 1
+  }
+  if(nrow(cf_data) == 0) {
     stop(paste("Could not find any valid values of background variables when processing condition",names(situation$condition),"=",situation$condition))
   }
-  valid_ind <- sample.int(nrow(validdata), size = n, replace = TRUE)
-  twin$simdata <- validdata[valid_ind,]
+  valid_ind <- sample.int(nrow(cf_data), size = n, replace = TRUE)
+  twin$simdata <- cf_data[valid_ind,]
   twin$simulate(n = n, fixedvars = twin$unames)
   return(twin$simdata)
+  #return(cf_data)
 }
+
 
 # rejection_sampling_onecondition <- function(twin, situation, fixedvars = NULL, n, control) {
 #   # \itemize{
@@ -371,8 +399,10 @@ scm_rejection_sampling <- function(twin, situation, n, control) {
 #' 'ifunction' that specify the intervention carried out in each parallel world
 #' \item condition : either a string that gives an SQL query ( e.g. "select x,y,z from DATA where" )
 #' or a data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))
+#' \item condition_type : (required only if method == "u_find") A character vector giving the type ("continuous" or "discrete") of every variable in \code{situation$condition}
 #' }
 #' @param n The number of rows in the data to be simulated
+#' @param method The simulation method, "u_find", "rejection" or "analytic_linear_gaussian"
 #' @param target NULL or a vector of variable names that specify the target
 #' variable(s) of the counterfactual intervention.
 #' @param ifunction NULL or a list of functions for the counterfactual intervention.
@@ -380,14 +410,13 @@ scm_rejection_sampling <- function(twin, situation, n, control) {
 #' world SCM returned?
 #' @param control List of parameters to be passed to the simulation method:
 #' \itemize{
-#' \item method:  "u_find" (default), "rejection" or "analytic_linear_gaussian"
-#' \item batchsize: (u_find) The size of data from n observations are resampled (default n)
-#' \item condition_type: (u_find) A character vector giving the type ("continuous" or "discrete") of every variable in \code{situation$condition}
+#' \item batchsize: (u_find, rejection) The size of data from n observations are resampled (default n)
 #' \item max_iterations: (u_find) The maximum number of iterations for the binary search (default 50)
 #' \item minu: (u_find) A scalar or a named list that specifies the lower starting value for the binary search (default -10)
 #' \item maxu: (u_find) A scalar or a named list that specifies the upper starting value for the binary search (default 10)
 #' \item sampling_replace: (u_find) Logical, resampling with replacement? (default TRUE)
 #' \item nonunique_jittersd: (u_find) Standard deviation of the noise to be added to the output (default NULL meaning no noise)
+#' \item maxbatchs: (u_find, rejection) The maximum number of batches for rejection sampling (for discrete variables)
 #' \item weightfunction: (u_find) A function or a named list of functions to be applied to dedicated error terms to obtain the resampling weights (default stats::dnorm)
 #' }
 #' @return A data table representing the situation after the counterfactual intervention
@@ -398,7 +427,7 @@ scm_rejection_sampling <- function(twin, situation, n, control) {
 #'                              condition = data.table::data.table( x = 0, y = 0)),
 #'                          target = "x",
 #'                          ifunction = 1,
-#'                          control = list(method = "rejection"),
+#'                          method = "rejection",
 #'                          n = 1000)
 #' mean(cfdata$y)
 #' 
@@ -414,14 +443,12 @@ scm_rejection_sampling <- function(twin, situation, n, control) {
 #'                              condition = data.table::data.table( y = 0, y_1 = 0, y_2 = 0)),
 #'                          target = "x",
 #'                          ifunction = 1,
-#'                          control = list(method = "rejection"),
+#'                          method = "rejection",
 #'                          n = 1000)
 #' mean(cfdata2$y)
 #' @export
-counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, returnscm = FALSE, control = NULL) {
-  control_defaults <- list(method = "u_find", 
-                           batchsize = n, 
-                           condition_type = NULL,
+counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, method = NULL, returnscm = FALSE, control = NULL) {
+  control_defaults <- list(batchsize = n, 
                            max_iterations = 50,
                            minu = -10,
                            maxu = 10,
@@ -440,6 +467,19 @@ counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, r
     }
     control <- control_new
   }
+  if( !(method %in% c("rejection","analytic_linear_gaussian","u_find"))) {
+    stop(" 'method' must have one of the values in c('u_find', 'rejection','analytic_linear_gaussian')")
+  }  
+  # if( !(method %in% c("rejection","analytic_linear_gaussian","u_find") || 
+  #       control$method %in% c("rejection","analytic_linear_gaussian","u_find"))) {
+  #  stop("Either 'method' or 'control$method' must have one of the values in c('rejection','analytic_linear_gaussian','u_find')")
+  # }
+  # if(is.null(control$method)) {
+  #   control$method <- method
+  # }
+  # if( !(identical(method,control$method))) {
+  #   stop(" 'method' and 'control$method' differ from each other. Please specify only one of these alternatives." )
+  # }
   if(!is.null(situation$dolist)) {
     twin <- ParallelWorld$new(scm, situation$dolist)     
   } else {
@@ -448,13 +488,14 @@ counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, r
       twin$intervene(situation$do$target, situation$do$ifunction)
     }
   }
-  if( identical(control$method, "rejection")) {
+  matched_method<- match.arg( method, c("rejection","analytic_linear_gaussian","u_find"))  
+  if( identical(matched_method, "rejection")) {
     cf_data <- scm_rejection_sampling(twin, situation, n, control)
   } 
-  if( identical(control$method, "analytic_linear_gaussian")) {
+  if( identical(matched_method, "analytic_linear_gaussian")) {
     cf_data <- analytic_linear_gaussian(twin, situation, n)
   } 
-  if( identical(control$method, "u_find")) {
+  if( identical(matched_method, "u_find")) {
     cf_data <- u_find(twin, situation, n, control)
   } 
   truen <- min(n, nrow(cf_data))
@@ -479,10 +520,12 @@ counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, r
 #' @param scm An SCM object
 #' @param sensitive A character vector of the names of sensitive variables
 #' @param condition A data.table consisting of the valid rows ( e.g. data.table::data.table( x = 0, y = 0))
+#' @param condition_type (required only if method == "u_find") A character vector giving the type ("continuous" or "discrete") of every variable in \code{condition}
 #' @param parents A character vector of the names of variables that remain fixed
 #' @param n The number of rows in the data to be simulated by \code{counterfactual}
 #' @param sens_values A data.table specifying the combinations of the values of sensitive variables to be considered (default NULL meaning the all possible combinations of the values of sensitive variables)
-#' @param modeltype "predict" or "function" depending on the type \code{modellist}
+#' @param modeltype "predict" (default) or "function" depending on the type \code{modellist}
+#' @param method The simulation method, "u_find", "rejection" or "analytic_linear_gaussian"
 #' @param control List of parameters to be passed to the simulation method, see \code{counterfactual}.
 #' @param ... Other arguments passed to \code{predict} or to the prediction functions.
 #' @return A list containing a data table for element of \code{modellist}. Each data table contains the predicted values after counterfactual interventions on the sensitive variables.
@@ -497,21 +540,20 @@ counterfactual <- function(scm, situation, n, target = NULL, ifunction = NULL, r
 #'                      sensitive = c("x"),
 #'                      sens_values = data.table::data.table(x=c(0,1)),
 #'                      condition = newd[1,c("x","y")],
+#'                      condition_type = list(x = "cont",
+#'                                            z = "cont",
+#'                                            y = "cont"),
 #'                      parents = NULL,
 #'                      n = 20,
 #'                      modeltype = "predict",
-#'                      control = list(method = "u_find",
-#'                                     condition_type = list(x = "cont",
-#'                                                           z = "cont",
-#'                                                           y = "cont")))
+#'                      method = "u_find")
 #' @export
-fairness <- function(modellist, scm, sensitive, condition, parents, n, 
-                     sens_values = NULL, 
-                     modeltype = "predict", control = list(), ...) {
+fairness <- function(modellist, scm, sensitive, condition, condition_type, 
+                     parents, n, sens_values = NULL, modeltype = "predict",
+                     method,  control = NULL, ...) {
   if(length(modeltype) == 1) modeltype <- rep(modeltype, length(modellist))
-  cfscm <- counterfactual(scm, situation = list(condition = condition), n, 
-                          returnscm = TRUE, control = control)
-  
+  cfscm <- counterfactual(scm, situation = list(condition = condition, condition_type = condition_type), 
+                          n = n, method = method, returnscm = TRUE, control = control)
   if(is.null(sens_values)) {
     sens_values <- unique(cfscm$simdata[, sensitive, with = FALSE])
   }
